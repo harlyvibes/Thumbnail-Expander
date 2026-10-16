@@ -2,7 +2,7 @@
 
 # Thumbnail Expander
 
-A Chrome extension for sites that play a preview when you hover a video thumbnail. It adds an expand button to the top-left corner of each thumbnail. Clicking it blows that hover preview up to fill the browser window. Nothing new is loaded, so it never opens the video's page.
+A Chrome extension for sites that play a preview when you hover a video thumbnail. It adds a small expand button to a corner of each thumbnail (you pick the corner, or hide the button and use a shortcut). Clicking it blows that hover preview up to fill the browser window. Nothing new is loaded, so it never opens the video's page.
 
 Comes with rules for YouTube and Dailymotion. Other sites can be added from the toolbar popup or the settings page.
 
@@ -17,8 +17,8 @@ Comes with rules for YouTube and Dailymotion. Other sites can be added from the 
 ## Usage
 
 1. Hover a thumbnail until the site starts its preview.
-2. Click the expand button in the thumbnail's top-left corner. The preview fills the window, exactly as the site plays it.
-3. Press **Esc** or the close button to put it back.
+2. Click the expand button in the thumbnail's corner, or press **Alt+Shift+E** (Option+Shift+E on Mac) with the mouse over the thumbnail. The preview fills the window, exactly as the site plays it.
+3. Press **Esc** or **Alt+Shift+E** to put it back. There's also a close button in the top-right corner. It stays hidden until you move the mouse, and hides again when the mouse rests.
 
 While it's enlarged, you can move the mouse anywhere and the preview keeps playing. Clicks on the preview are blocked, so they can't open the video, and the page doesn't scroll. If you click expand before the preview starts, it waits a few seconds for it.
 
@@ -30,13 +30,14 @@ While it's enlarged, the site doesn't see mouse movement, so it can't tell the m
 
 ## Settings
 
-Click the toolbar icon for quick switches (the extension, the current site, debug mode), or choose **Settings** for the full list.
+Click the toolbar icon for quick settings (the extension, the current site and its expand button, debug mode), or choose **Settings** for the full list.
 
 Each site rule has:
 
 - **Domains**: where the rule applies (subdomains included).
 - **Thumbnail selector**: CSS selector for the thumbnail element. The expand button is placed inside it.
 - **Preview selector** (optional): CSS selector for the element the site plays as the preview. Leave it empty to use whichever video (or player iframe) is playing over the thumbnail.
+- **Expand button**: which corner of the thumbnail the button goes in. Pick one that doesn't cover the site's own buttons, or choose **Hidden** and use **Alt+Shift+E**.
 
 Changes from the popup apply immediately. Changes on the settings page apply when you click **Save changes**. Open pages update without a reload.
 
@@ -59,7 +60,8 @@ In the toolbar popup:
 
 Common problems:
 
-- **No expand buttons**: the thumbnail selector matches nothing. Turn on debug mode to see the outlines, or use **Pick thumbnail**.
+- **No expand buttons**: the button may be set to **Hidden** for the site (see the toolbar popup). Otherwise the thumbnail selector matches nothing. Turn on debug mode to see the outlines, or use **Pick thumbnail**.
+- **The expand button covers the site's own buttons**: choose another corner, or **Hidden**, under **Expand button** in the toolbar popup.
 - **"No preview is playing in this thumbnail"**: hover until the site starts its preview, then click expand. If the preview is playing and it still says this, set the preview selector with **Alt+Shift+P**.
 - **The wrong thing gets enlarged**: set the preview selector with **Alt+Shift+P** over the actual preview.
 - **"Reload the page and try again"** in the popup: the page was open before the extension was installed or reloaded.

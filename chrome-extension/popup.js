@@ -32,6 +32,13 @@
     $("#rule-name").textContent = rule.name || host;
     $("#rule-host").textContent = host;
     $("#site-enabled").checked = rule.enabled !== false;
+    const buttonPos = $("#button-pos");
+    for (const [value, label] of Object.entries(BUTTON_POSITIONS)) buttonPos.add(new Option(label, value));
+    buttonPos.value = rule.button;
+    buttonPos.addEventListener("change", () => {
+      rule.button = buttonPos.value;
+      save();
+    });
     $("#preview-sel").textContent = rule.preview || "auto (the video playing over the thumbnail)";
   } else if (host) {
     site.dataset.state = "norule";
@@ -112,7 +119,14 @@
     else if (!t.valid) lines.push({ ok: false, text: "Thumbnail selector isn't valid CSS:", code: t.selector });
     else {
       lines.push({ ok: t.count > 0, text: `Thumbnail selector matches ${t.count} on this page (outlined in purple).` });
-      if (t.count) lines.push({ ok: t.buttons > 0, text: `Expand buttons on the page: ${t.buttons}.` });
+      if (t.count) {
+        lines.push({
+          ok: t.ready > 0,
+          text: t.button === "hidden"
+            ? `Thumbnails ready to expand with Alt+Shift+E: ${t.ready} (the expand button is hidden).`
+            : `Expand buttons on the page: ${t.ready}.`
+        });
+      }
     }
 
     const p = r.preview;

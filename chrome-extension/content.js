@@ -9,6 +9,8 @@
   // Marks the enlarged preview; content.css sizes it to the window.
   const ENLARGED_ATTR = "data-te-enlarged";
   const WAIT_FOR_PREVIEW_MS = 5000;
+  // The close button on an enlarged preview hides after the mouse rests this long.
+  const CONTROLS_IDLE_MS = 2500;
   // Mouse movement the site would use to notice the mouse leaving its thumbnail.
   const MOVE_EVENTS = [
     "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave",
@@ -19,7 +21,8 @@
   let settings = null;
   let activeRules = [];
   const hostRules = new WeakMap(); // button host -> its site rule
-  let preview = null; // the enlarged preview: { media, host, rule, restore, ui, timer, watcher, misses }
+  // The enlarged preview: { media, host, rule, restore, ui, timer, watcher, misses, anchor, moved, idleTimer }
+  let preview = null;
   let scanQueued = false;
   let observer = null;
   let lastMouse = null; // for the debug shortcut
@@ -37,7 +40,7 @@
     settings = await loadSettings();
     applySettings();
 
-    window.addEventListener("keydown", onDebugShortcut, true);
+    window.addEventListener("keydown", onShortcut, true);
     // On window, and added before the enlarged preview hides mouse movement from the site, so it
     // still sees the mouse.
     window.addEventListener("mousemove", onMouseMove, { capture: true, passive: true });
@@ -96,7 +99,7 @@
       thumbs.forEach((thumb) => {
         if (attach(thumb, rule)) added++;
       });
-      if (added) log(`${rule.name}: added ${added} button(s); thumbnail selector matches ${thumbs.length} on the page.`);
+      if (added) log(`${rule.name}: set up ${added} thumbnail(s); thumbnail selector matches ${thumbs.length} on the page.`);
     }
   }
 
@@ -135,10 +138,12 @@
     return svg;
   }
 
-  // Adds the expand button to one thumbnail. Returns true if a button was added.
+  // Sets up one thumbnail: marks it for the shortcut and the debug tools, and adds the expand
+  // button unless the rule hides it. Returns true if the thumbnail is new.
   function attach(thumb, rule) {
     if (thumb.hasAttribute(ATTACHED_ATTR)) return false;
     thumb.setAttribute(ATTACHED_ATTR, "1");
+    const hidden = rule.button === "hidden";
 
     // The button is absolutely positioned, so it needs a positioning context. An inline element
     // (typically a link wrapping an absolutely positioned image) must not be made relative: its
@@ -148,17 +153,19 @@
     const style = getComputedStyle(thumb);
     if (style.display === "inline" || style.display === "contents") {
       host = thumb.offsetParent || thumb.parentElement;
-    } else if (style.position === "static") {
+    } else if (style.position === "static" && !hidden) {
       thumb.style.position = "relative";
     }
-    // No usable container (the button would land in a page corner), or it already has a button.
+    // No usable container (the button would land in a page corner), or it's already set up.
     if (!host || host === document.body || host === document.documentElement) return false;
-    if (host.querySelector(`:scope > .${BUTTON_CLASS}`)) return false;
+    if (host.hasAttribute(HOST_ATTR)) return false;
+    host.setAttribute(HOST_ATTR, "");
+    hostRules.set(host, rule);
+    if (hidden) return true;
 
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = BUTTON_CLASS;
-    btn.title = "Expand preview";
+    btn.className = `${BUTTON_CLASS} te-pos-${rule.button}`;
     btn.setAttribute("aria-label", "Expand preview");
     btn.appendChild(createIcon(EXPAND_ICON));
     btn.addEventListener("click", (e) => {
@@ -167,9 +174,6 @@
       e.stopPropagation();
       expandPreview(host, rule);
     });
-
-    host.setAttribute(HOST_ATTR, "");
-    hostRules.set(host, rule);
     host.appendChild(btn);
     return true;
   }
@@ -194,8 +198,8 @@
       log("No preview found for", host, rule.preview ? `(preview selector: ${rule.preview})` : "(auto-detect)");
       toast(
         rule.preview
-          ? `No preview found with this site's preview selector (${rule.preview}). Hover the thumbnail until the preview plays, then click expand.`
-          : "No preview is playing in this thumbnail. Hover it until the preview starts, then click expand."
+          ? `No preview found with this site's preview selector (${rule.preview}). Hover the thumbnail until the preview plays, then try again.`
+          : "No preview is playing in this thumbnail. Hover it until the preview starts, then try again."
       );
       return;
     }
@@ -299,6 +303,7 @@
     // the page, so the mouse is still inside the thumbnail as far as the page can tell.
     const ui = document.createElement("div");
     ui.id = "te-preview-ui";
+    ui.className = "te-idle"; // the close button shows once the mouse moves
     ui.setAttribute("popover", "manual");
     ui.append(...createCloseControls());
     CLICKS.forEach((type) => ui.addEventListener(type, (e) => e.stopPropagation()));
@@ -309,7 +314,14 @@
     watcher.observe(media, { attributes: true, attributeFilter: [ENLARGED_ATTR, "popover"] });
 
     setWatched(null);
-    preview = { media, host, rule, restore, ui, watcher, timer: setInterval(checkEnlarged, 250), misses: 0 };
+    preview = {
+      media, host, rule, restore, ui, watcher,
+      timer: setInterval(checkEnlarged, 250),
+      misses: 0,
+      anchor: lastMouse, // where the mouse was when it opened (see revealControls)
+      moved: false,
+      idleTimer: null
+    };
     document.addEventListener("keydown", onKeyDown, true);
 
     if (!keepEnlarged()) {
@@ -317,9 +329,27 @@
       toast("Couldn't enlarge this preview.");
       return false;
     }
-    // Keyboard focus moves to the close button, off the expand button underneath.
-    ui.querySelector(".te-close").focus({ preventScroll: true });
+    // Take keyboard focus off the expand button underneath, so keys can't press it again.
+    if (document.activeElement?.classList.contains(BUTTON_CLASS)) document.activeElement.blur();
     return true;
+  }
+
+  // The close button is hidden until the mouse moves over the enlarged preview, and hides again
+  // once the mouse rests (unless it's resting on the button).
+  function revealControls() {
+    const p = preview;
+    if (!p.moved) {
+      // The browser can send a mousemove without real movement when the page changes under it.
+      if (p.anchor && Math.hypot(lastMouse.x - p.anchor.x, lastMouse.y - p.anchor.y) < 4) return;
+      p.moved = true;
+    }
+    p.ui.classList.remove("te-idle");
+    clearTimeout(p.idleTimer);
+    p.idleTimer = setTimeout(function hide() {
+      if (preview !== p) return;
+      if (p.ui.querySelector(".te-close:hover")) p.idleTimer = setTimeout(hide, CONTROLS_IDLE_MS);
+      else p.ui.classList.add("te-idle");
+    }, CONTROLS_IDLE_MS);
   }
 
   // Puts the enlarged preview in the top layer, with the close button above it. Called again
@@ -369,6 +399,7 @@
   function closePreview() {
     if (!preview) return;
     clearInterval(preview.timer);
+    clearTimeout(preview.idleTimer);
     preview.watcher.disconnect();
     preview.ui.remove();
     preview.restore.reverse().forEach((undo) => undo());
@@ -535,16 +566,50 @@
 
   function onMouseMove(e) {
     lastMouse = { x: e.clientX, y: e.clientY };
+    if (preview) revealControls();
   }
 
-  // Debug mode shortcut: Alt+Shift+P (Option+Shift+P on Mac). Hover a thumbnail until its preview
-  // plays, then press it: the video under the mouse is saved as this site's preview selector.
-  // Matched by key position so it works on any keyboard layout.
-  function onDebugShortcut(e) {
-    if (!settings?.debug || e.code !== "KeyP" || !e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return;
-    e.preventDefault();
-    e.stopPropagation();
-    grabPreviewUnderMouse();
+  // Keyboard shortcuts (Option instead of Alt on a Mac), matched by key position so they work on
+  // any keyboard layout:
+  //   Alt+Shift+E  expand the preview of the thumbnail under the mouse, or close the enlarged one
+  //   Alt+Shift+P  debug mode: save the video under the mouse as this site's preview selector
+  function onShortcut(e) {
+    if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return;
+    if (e.code === "KeyE" && (preview || activeRules.length)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (preview) closePreview();
+      else expandUnderMouse();
+    } else if (e.code === "KeyP" && settings?.debug) {
+      e.preventDefault();
+      e.stopPropagation();
+      grabPreviewUnderMouse();
+    }
+  }
+
+  function expandUnderMouse() {
+    const host = lastMouse && thumbnailAt(lastMouse);
+    if (!host) {
+      toast("Point at a video thumbnail, then press Alt+Shift+E.");
+      return;
+    }
+    expandPreview(host, hostRules.get(host));
+  }
+
+  // The innermost thumbnail at a point. Found by position, so overlays on top don't get in the way.
+  function thumbnailAt(point) {
+    let best = null;
+    let bestArea = Infinity;
+    for (const host of document.querySelectorAll(`[${HOST_ATTR}]`)) {
+      const r = host.getBoundingClientRect();
+      if (point.x < r.left || point.x > r.right || point.y < r.top || point.y > r.bottom) continue;
+      const area = r.width * r.height;
+      if (area < bestArea) {
+        best = host;
+        bestArea = area;
+      }
+    }
+    return best;
   }
 
   async function grabPreviewUnderMouse() {
@@ -575,7 +640,7 @@
     };
     if (!rule) return result;
 
-    const t = { selector: rule.thumbnail, valid: true, count: 0, buttons: document.querySelectorAll(`.${BUTTON_CLASS}`).length };
+    const t = { selector: rule.thumbnail, valid: true, count: 0, ready: document.querySelectorAll(`[${HOST_ATTR}]`).length, button: rule.button };
     let thumbs = [];
     try {
       thumbs = rule.thumbnail ? [...document.querySelectorAll(rule.thumbnail)] : [];

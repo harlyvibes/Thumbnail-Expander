@@ -5,7 +5,7 @@
   const statusEl = $("#status");
   const template = $("#site-template");
 
-  const TEXT_FIELDS = ["name", "hosts", "thumbnail", "preview"];
+  const FIELDS = ["name", "hosts", "thumbnail", "preview", "button"];
 
   let dirty = false;
 
@@ -46,7 +46,9 @@
   function addSiteCard(site, { open = false } = {}) {
     const card = template.content.firstElementChild.cloneNode(true);
 
-    for (const key of TEXT_FIELDS) {
+    const buttonPos = card.querySelector('[data-key="button"]');
+    for (const [value, label] of Object.entries(BUTTON_POSITIONS)) buttonPos.add(new Option(label, value));
+    for (const key of FIELDS) {
       card.querySelector(`[data-key="${key}"]`).value = site[key] ?? "";
     }
     card.querySelector('[data-key="enabled"]').checked = site.enabled !== false;
@@ -99,7 +101,7 @@
   function readSites() {
     return [...sitesEl.querySelectorAll(".site")].map((card) => {
       const site = { enabled: card.querySelector('[data-key="enabled"]').checked };
-      for (const key of TEXT_FIELDS) {
+      for (const key of FIELDS) {
         site[key] = card.querySelector(`[data-key="${key}"]`).value.trim();
       }
       return site;
