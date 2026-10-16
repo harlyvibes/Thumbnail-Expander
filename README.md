@@ -27,6 +27,7 @@ Click the toolbar icon and choose **Settings** (or `chrome://extensions` > Thumb
 
 - **Enable**: turn the extension on or off globally.
 - **Autoplay**: start the video as soon as it's expanded.
+- **Debug mode**: see [Debugging tools](#debugging-tools).
 - **Sites**: one rule per website. Click a site to edit it. Each rule has:
   - **Domains**: where the rule applies (subdomains included).
   - **Thumbnail selector**: CSS selector for the thumbnail element. The button is placed inside it.
@@ -45,10 +46,32 @@ Dailymotion is the opposite: it refuses to show its pages in frames, but its emb
 
 ## Adding a site
 
+The quickest way is with the picker:
+
+1. Open the site's thumbnail page, click the toolbar icon, and choose **Pick thumbnail**. Point at a thumbnail and click. This creates a rule for the site with a thumbnail selector.
+2. Open one of its videos, click the toolbar icon, and choose **Pick player**. Point at the player and click.
+3. Go back to the thumbnails and try the expand button. If it doesn't work, use **Check this page** (see below).
+
+To do it by hand:
+
 1. Open the site and right-click a thumbnail, then choose **Inspect**.
 2. Find the element that wraps the thumbnail and note its tag, class, or id.
 3. Click the toolbar icon and choose **Add this site** (or **Add a site** on the settings page), then fill in the fields. Target the box that is the size of the thumbnail image, not a bare link: a selector like `a[href*='/video/']` also matches title text links. If class names end in a build hash, match the stable start (`[class*='VideoCard__thumb']`) and use `:has()` to require a video link inside (`div:has(> a[href*='/video/'])`).
 4. Save, reload the site, and hover a thumbnail.
+
+## Debugging tools
+
+All in the toolbar popup:
+
+- **Debug mode**: logs what the extension does to the browser console (filter it by `Thumbnail Expander`), outlines every thumbnail it recognized in purple, and keeps their buttons visible. When you expand a video, a panel in the top-left says what the player selector matched, whether the video is inside it, and suggests a better selector with a **Use** button.
+- **Check this page**: tests the site's rule against the open page and outlines what matches: thumbnails in purple, the player in red. It reports how many thumbnails matched and whether their video links were found, plus the embed URL in embed mode. On a video page, it reports whether the player selector contains the video, and suggests one with a **Use** button if it doesn't.
+- **Pick thumbnail** / **Pick player**: point at an element and click to save a selector for it. **↑**/**↓** move to the parent/child element, and **Esc** cancels. The label shows the selector it will use and how many elements on the page it matches.
+
+Common problems:
+
+- **Audio but no picture when expanded**: the player selector doesn't match the element around the video, so the video gets hidden. Open a video, then use **Check this page** or **Pick player**.
+- **No expand buttons**: the thumbnail selector matches nothing. Turn on debug mode to see the outlines, or use **Pick thumbnail**.
+- **"Reload the page and try again"** in the popup: the page was open before the extension was installed or reloaded.
 
 ## Notes
 

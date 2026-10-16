@@ -184,6 +184,175 @@ html.te-locked body {
   overflow: hidden !important;
 }
 
+/* ---------- Debug tools ---------- */
+
+/* Debug mode: outline every recognized thumbnail and keep its button visible */
+html.te-debug [data-te-attached] {
+  outline: 2px dashed rgba(168, 85, 247, 0.85) !important;
+  outline-offset: -2px !important;
+}
+
+html.te-debug .te-expand-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* "Check this page" highlights */
+.te-hl-thumb {
+  outline: 3px dashed #a855f7 !important;
+  outline-offset: -3px !important;
+}
+
+.te-hl-player {
+  outline: 4px solid #f43f5e !important;
+  outline-offset: -4px !important;
+}
+
+/* Element picker: a transparent layer catches the mouse; a box and label show the pick */
+.te-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  cursor: crosshair;
+  background: transparent;
+}
+
+.te-picker-box {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
+  border: 2px solid #a855f7;
+  border-radius: 4px;
+  background: rgba(168, 85, 247, 0.15);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+.te-picker-label,
+.te-picker-banner,
+.te-toast,
+.te-debug-panel {
+  font: 12.5px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #fff;
+  background: rgba(18, 18, 24, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+.te-picker-label {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  max-width: calc(100vw - 8px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.te-picker-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 2147483647;
+  transform: translateX(-50%);
+  pointer-events: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.te-picker-banner b { margin-right: 6px; }
+
+.te-picker-banner kbd,
+.te-debug-panel kbd {
+  font: 600 11px/1 system-ui, sans-serif;
+  padding: 2px 5px;
+  margin: 0 2px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Toast for picker results and saved suggestions */
+.te-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 2147483647;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  text-align: center;
+  overflow-wrap: anywhere;
+  animation: te-toast 7s ease forwards;
+}
+
+/* Debug panel in the expanded view */
+#te-overlay .te-debug-panel {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  width: max-content;
+  max-width: min(440px, calc(100% - 90px));
+  padding: 10px 12px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.te-debug-title {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+}
+
+.te-debug-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  padding-left: 16px;
+  position: relative;
+}
+
+.te-debug-line::before {
+  position: absolute;
+  left: 0;
+  font-weight: 700;
+}
+
+.te-debug-line.ok::before { content: "✓"; color: #4ade80; }
+.te-debug-line.bad::before { content: "✗"; color: #f87171; }
+.te-debug-line.info::before { content: "•"; color: #a1a1aa; }
+
+.te-debug-line code {
+  font: 11.5px/1.4 ui-monospace, "Cascadia Code", Consolas, monospace;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow-wrap: anywhere;
+}
+
+.te-debug-line button {
+  all: initial;
+  font: 600 11.5px/1 system-ui, sans-serif;
+  color: #fff;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  cursor: pointer;
+}
+
+.te-debug-line button:hover { opacity: 0.9; }
+
 @keyframes te-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -191,6 +360,11 @@ html.te-locked body {
 
 @keyframes te-spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes te-toast {
+  0%, 88% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @keyframes te-hint {

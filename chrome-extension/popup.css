@@ -1,7 +1,7 @@
 /* Toolbar popup. Shared tokens and components live in ui.css. */
 
 body {
-  width: 300px;
+  width: 320px;
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -29,6 +29,32 @@ svg path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: ro
 .state-norule { padding: 12px 14px 14px; }
 .site-msg { margin: 0 0 10px; font-size: 13px; overflow-wrap: anywhere; }
 .state-nopage .site-msg { margin: 0; padding: 12px 14px; }
+
+/* Debug tools */
+.debug .row-desc.plain { font-family: inherit; font-size: 12px; }
+.debug-tools { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.pick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pick-row .btn { padding: 0 6px; gap: 5px; font-size: 12.5px; white-space: nowrap; }
+body.nopage .debug { display: none; }
+
+.report {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12.5px;
+}
+
+.report li { position: relative; padding-left: 18px; overflow-wrap: anywhere; }
+.report li::before { position: absolute; left: 0; font-weight: 700; }
+.report li.ok::before { content: "✓"; color: var(--success); }
+.report li.bad::before { content: "✗"; color: var(--danger); }
+.report li.info::before { content: "•"; color: var(--muted); }
+.report code { font-size: 11.5px; }
+.report .use { margin-left: 4px; height: 24px; padding: 0 8px; font-size: 11.5px; vertical-align: middle; }
 
 /* Everything below the main switch is dimmed while the extension is off */
 body.off .site,

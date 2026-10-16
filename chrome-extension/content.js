@@ -13,9 +13,24 @@
 
   init();
 
+  // Console output, only in debug mode.
+  function log(...args) {
+    if (settings?.debug) console.log("%c[Thumbnail Expander]", "color:#8b5cf6;font-weight:bold", ...args);
+  }
+
   async function init() {
     settings = await loadSettings();
     applySettings();
+
+    // Requests from the toolbar popup's debug tools.
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (msg?.type === "te-check") {
+        sendResponse(checkPage());
+      } else if (msg?.type === "te-pick") {
+        sendResponse({ ok: true });
+        pickSelector(msg.field);
+      }
+    });
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync") return;
@@ -42,6 +57,9 @@
     if (settings.enabled) {
       activeRules = settings.sites.filter((s) => s.enabled && s.thumbnail && ruleMatchesHost(s, location.hostname));
     }
+    // Debug mode outlines every recognized thumbnail (see content.css).
+    document.documentElement.classList.toggle("te-debug", Boolean(settings.debug));
+    log(activeRules.length ? `Active rules: ${activeRules.map((r) => r.name).join(", ")}` : "No rule for this site.");
     scan();
     observeDom();
   }
@@ -55,7 +73,11 @@
         console.warn("[Thumbnail Expander] Bad selector for", rule.name, err);
         continue;
       }
-      thumbs.forEach((thumb) => attach(thumb, rule));
+      let added = 0;
+      thumbs.forEach((thumb) => {
+        if (attach(thumb, rule)) added++;
+      });
+      if (added) log(`${rule.name}: added ${added} button(s); thumbnail selector matches ${thumbs.length} on the page.`);
     }
   }
 
@@ -95,8 +117,9 @@
     return svg;
   }
 
+  // Adds the expand button to one thumbnail. Returns true if a button was added.
   function attach(thumb, rule) {
-    if (thumb.hasAttribute(ATTACHED_ATTR)) return;
+    if (thumb.hasAttribute(ATTACHED_ATTR)) return false;
     thumb.setAttribute(ATTACHED_ATTR, "1");
 
     // The button is absolutely positioned, so it needs a positioning context. An inline element
@@ -111,8 +134,8 @@
       thumb.style.position = "relative";
     }
     // No usable container (the button would land in a page corner), or it already has a button.
-    if (!host || host === document.body || host === document.documentElement) return;
-    if (host.querySelector(`:scope > .${BUTTON_CLASS}`)) return;
+    if (!host || host === document.body || host === document.documentElement) return false;
+    if (host.querySelector(`:scope > .${BUTTON_CLASS}`)) return false;
 
     const btn = document.createElement("button");
     btn.type = "button";
@@ -125,10 +148,13 @@
       // Stop the thumbnail's link from navigating to the watch page.
       e.preventDefault();
       e.stopPropagation();
-      openOverlay(getVideoUrl(thumb, rule), rule);
+      const url = getVideoUrl(thumb, rule);
+      log(`Expand clicked (${rule.name}, ${rule.mode} mode). Video link:`, url || "(none found)", "Thumbnail:", thumb);
+      openOverlay(url, rule);
     });
 
     host.appendChild(btn);
+    return true;
   }
 
   function getVideoUrl(thumb, rule) {
@@ -228,6 +254,13 @@
   // Embed mode: load the site's embeddable player. Returns an error message, or null.
   function addEmbedFrame(videoUrl, rule) {
     const embedUrl = videoUrl ? buildEmbedUrl(videoUrl, rule) : null;
+    if (settings.debug) {
+      createDebugPanel().set([
+        { ok: Boolean(videoUrl), text: "Video link:", code: videoUrl || "(none found)" },
+        { ok: Boolean(embedUrl), text: embedUrl ? "Embed URL:" : "No video ID matched the ID pattern:", code: embedUrl || rule.idPattern }
+      ]);
+      log("Embed URL:", embedUrl || "(none: the ID pattern didn't match the link)");
+    }
     if (!embedUrl) {
       return `Could not find a video ID in this link (${videoUrl || "no link"}). Check the site rule's ID pattern in the options page.`;
     }
@@ -279,16 +312,64 @@
 
     const started = Date.now();
     let pausedOnce = false;
+    let ticks = 0;
+    const panel = settings.debug ? createDebugPanel() : null;
 
     const reveal = () => {
       iframe.classList.remove("te-loading");
       loading.remove();
     };
 
+    // Debug mode: report what the player selector matches inside the video page.
+    const report = (doc, phase) => {
+      if (!panel) return;
+      const lines = [{ ok: null, text: "Video page:", code: url.pathname + url.search }];
+      if (!doc || doc.location.href === "about:blank") {
+        lines.push({ ok: null, text: "Loading the video page…" });
+        panel.set(lines);
+        return;
+      }
+      let matches = [];
+      try {
+        matches = [...doc.querySelectorAll(rule.playerSelector)];
+        lines.push({ ok: matches.length > 0, text: `Player selector matches ${matches.length}:`, code: rule.playerSelector });
+      } catch {
+        lines.push({ ok: false, text: "Player selector isn't valid CSS:", code: rule.playerSelector });
+      }
+      if (matches.length) {
+        const inside = matches.some((m) => m.matches(TE_MEDIA) || m.querySelector(TE_MEDIA));
+        lines.push({
+          ok: inside,
+          text: inside ? "The video is inside the matched player." : "The video isn't inside the matched element, so it's hidden (audio only)."
+        });
+      }
+      const media = teFindMainMedia(doc);
+      lines.push(media ? { ok: null, text: "Video on the page:", code: teDescribe(media) } : { ok: false, text: "No video on the page yet." });
+      if (media) {
+        const suggestion = teSuggestSelector(tePlayerElementFor(media), "player");
+        if (suggestion && suggestion.sel !== rule.playerSelector) {
+          lines.push({
+            ok: null,
+            text: "Suggested player selector:",
+            code: suggestion.sel,
+            action: { label: "Use", run: () => useSuggestion("playerSelector", suggestion.sel) }
+          });
+        }
+      }
+      if (phase === "timeout") lines.push({ ok: false, text: `Stopped waiting for the player after ${FRAME_TIMEOUT_MS / 1000} s.` });
+      panel.set(lines);
+    };
+
     framePoll = setInterval(() => {
       if (Date.now() - started > FRAME_TIMEOUT_MS) {
         stopFramePoll();
         reveal();
+        let doc = null;
+        try {
+          doc = iframe.contentDocument;
+        } catch {}
+        report(doc, "timeout");
+        log(`Page mode: player selector "${rule.playerSelector}" never matched on the video page.`);
         return;
       }
 
@@ -297,10 +378,13 @@
         doc = iframe.contentDocument;
       } catch {
         // The page redirected to another site; it can't be styled, so just show it.
+        log("Page mode: the video page redirected to another site, so it can't be styled.");
         stopFramePoll();
         reveal();
         return;
       }
+      // The panel is rebuilt every half second, not every tick: suggestions query the page.
+      if (ticks++ % 5 === 0) report(doc);
       // The frame starts on about:blank before the real page loads.
       if (!doc || doc.location.href === "about:blank" || !doc.head) return;
 
@@ -325,11 +409,170 @@
 
       stopFramePoll();
       reveal();
+      report(doc, "found");
+      log("Page mode: player found:", player, player.querySelector(TE_MEDIA) ? "(video inside)" : "(no video inside: it will be hidden)");
       // Let the player re-measure itself now that it fills the window.
       iframe.contentWindow.dispatchEvent(new Event("resize"));
     }, 100);
 
     return null;
+  }
+
+  // ---------- Debug tools ----------
+
+  // Small status panel in the top-left of the expanded view (debug mode only).
+  function createDebugPanel() {
+    const panel = document.createElement("div");
+    panel.className = "te-debug-panel";
+    overlay.appendChild(panel);
+    let last = "";
+    return {
+      el: panel,
+      // lines: [{ ok: true | false | null, text, code?, action?: { label, run } }]
+      set(lines) {
+        // Only rebuild when something changed, so a click on a button isn't lost mid-rebuild.
+        const key = JSON.stringify(lines.map(({ ok, text, code }) => [ok, text, code]));
+        if (key === last) return;
+        last = key;
+        panel.textContent = "";
+        const title = document.createElement("div");
+        title.className = "te-debug-title";
+        title.textContent = "Debug";
+        panel.appendChild(title);
+        for (const line of lines) {
+          const row = document.createElement("div");
+          row.className = "te-debug-line " + (line.ok === true ? "ok" : line.ok === false ? "bad" : "info");
+          const text = document.createElement("span");
+          text.textContent = line.text;
+          row.appendChild(text);
+          if (line.code) {
+            const code = document.createElement("code");
+            code.textContent = line.code;
+            row.appendChild(code);
+          }
+          if (line.action) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = line.action.label;
+            button.addEventListener("click", line.action.run);
+            row.appendChild(button);
+          }
+          panel.appendChild(row);
+        }
+      }
+    };
+  }
+
+  // Saves a selector into this site's rule (creating the rule if needed).
+  async function saveSelector(field, value) {
+    const data = await chrome.storage.sync.get(["settings"]);
+    const updated = mergeSettings(data.settings);
+    const result = applyPickedSelector(updated, location.hostname, field, value);
+    await chrome.storage.sync.set({ settings: updated });
+    log(`Saved ${field} for ${result.rule.name}:`, value);
+    return result;
+  }
+
+  async function useSuggestion(field, value) {
+    await saveSelector(field, value);
+    toast(`Saved. Close this and expand the video again to use ${value}.`);
+  }
+
+  // Message along the bottom of the page (or the expanded view) that fades out.
+  function toast(text) {
+    document.querySelector(".te-toast")?.remove();
+    const el = document.createElement("div");
+    el.className = "te-toast";
+    el.textContent = text;
+    document.documentElement.appendChild(el);
+    setTimeout(() => el.remove(), 7000);
+  }
+
+  // "Check this page" from the popup: test this site's rule against the current page,
+  // highlight what matches, and report back.
+  function checkPage() {
+    const rule = settings.sites.find((s) => ruleMatchesHost(s, location.hostname)) || null;
+    const result = {
+      extensionEnabled: settings.enabled,
+      rule: rule && { name: rule.name, enabled: rule.enabled !== false, mode: rule.mode }
+    };
+
+    if (rule) {
+      const t = { selector: rule.thumbnail, valid: true, count: 0, withLink: 0, offSite: 0 };
+      let thumbs = [];
+      try {
+        thumbs = rule.thumbnail ? [...document.querySelectorAll(rule.thumbnail)] : [];
+      } catch {
+        t.valid = false;
+      }
+      const urls = thumbs.map((th) => getVideoUrl(th, rule)).filter(Boolean);
+      t.count = thumbs.length;
+      t.withLink = urls.length;
+      t.offSite = urls.filter((u) => {
+        try {
+          return new URL(u).origin !== location.origin;
+        } catch {
+          return true;
+        }
+      }).length;
+      t.sample = urls.find((u) => u.startsWith(location.origin)) || urls[0] || null;
+      if (t.sample && rule.mode !== "page") t.embedUrl = buildEmbedUrl(t.sample, rule);
+      result.thumbnails = t;
+      teHighlight(thumbs, "thumb");
+    }
+
+    // On a video page: does the player selector find the player around the video?
+    const media = teFindMainMedia();
+    const p = { hasVideo: Boolean(media), video: media ? teDescribe(media) : null };
+    if (media) p.suggestion = teSuggestSelector(tePlayerElementFor(media), "player")?.sel || null;
+    if (rule?.mode === "page" && rule.playerSelector) {
+      p.selector = rule.playerSelector;
+      let matches = [];
+      try {
+        matches = [...document.querySelectorAll(rule.playerSelector)];
+        p.valid = true;
+      } catch {
+        p.valid = false;
+      }
+      p.count = matches.length;
+      p.containsVideo = Boolean(media) && matches.some((m) => m === media || m.contains(media));
+      teHighlight(matches, "player");
+    }
+    result.player = p;
+
+    log("Check this page:", result);
+    return result;
+  }
+
+  // "Pick thumbnail" / "Pick player" from the popup.
+  async function pickSelector(field) {
+    const kind = field === "playerSelector" ? "player" : "thumbnail";
+    const el = await tePickElement({
+      kind,
+      title: kind === "player" ? "Point at the video player." : "Point at a video thumbnail."
+    });
+    if (!el) return;
+
+    // Arrow keys can land on an image; the thumbnail must be able to hold the button.
+    const target = kind === "thumbnail" ? teButtonHost(el) : el;
+    const suggestion = teSuggestSelector(target, kind);
+    if (!suggestion) {
+      toast("Couldn't build a selector for that element. Try its parent (↑) next time.");
+      return;
+    }
+    const { rule, created, switchedToPage } = await saveSelector(field, suggestion.sel);
+    teHighlight(document.querySelectorAll(suggestion.sel), kind);
+
+    let text =
+      kind === "player"
+        ? `Player selector for ${rule.name}: ${suggestion.sel}.`
+        : `Thumbnail selector for ${rule.name}: ${suggestion.sel} (${suggestion.count} on this page).`;
+    if (created) text += " New site rule created.";
+    if (switchedToPage) text += " Switched to page mode.";
+    if (kind === "thumbnail" && rule.mode === "page" && !rule.playerSelector) {
+      text += " Next: open a video and use Pick player.";
+    }
+    toast(text);
   }
 
   function stopFramePoll() {

@@ -44,6 +44,7 @@
   function render(settings) {
     $("#enabled").checked = settings.enabled;
     $("#autoplay").checked = settings.autoplay;
+    $("#debug").checked = settings.debug;
     sitesEl.textContent = "";
     settings.sites.forEach((site) => addSiteCard(site));
   }
@@ -104,29 +105,10 @@
   }
 
   function addNewSite(host = "") {
-    const card = addSiteCard(
-      {
-        name: host ? prettyName(host) : "New site",
-        enabled: true,
-        hosts: host,
-        thumbnail: "",
-        link: "",
-        mode: "page",
-        playerSelector: "",
-        idPattern: "",
-        embedUrl: ""
-      },
-      { open: true }
-    );
+    const card = addSiteCard(newSiteRule(host), { open: true });
     card.scrollIntoView({ behavior: "smooth", block: "center" });
     card.querySelector(host ? '[data-key="thumbnail"]' : '[data-key="name"]').focus({ preventScroll: true });
     setStatus("dirty");
-  }
-
-  // "www.vimeo.com" -> "Vimeo"
-  function prettyName(host) {
-    const label = host.replace(/^www\./, "").split(".")[0] || host;
-    return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
   // ---------- Reading and validating ----------
@@ -213,6 +195,7 @@
       version: SETTINGS_VERSION,
       enabled: $("#enabled").checked,
       autoplay: $("#autoplay").checked,
+      debug: $("#debug").checked,
       sites
     };
     await chrome.storage.sync.set({ settings });

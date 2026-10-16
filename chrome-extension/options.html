@@ -38,6 +38,13 @@
           </span>
           <input type="checkbox" class="switch" id="autoplay">
         </label>
+        <label class="row">
+          <span>
+            <span class="row-title">Debug mode</span>
+            <span class="row-desc">Log to the browser console, outline recognized thumbnails, and show a status panel when a video is expanded.</span>
+          </span>
+          <input type="checkbox" class="switch" id="debug">
+        </label>
       </div>
     </section>
 
@@ -59,6 +66,7 @@
           <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
           How to add a site
         </summary>
+        <p class="help-tip"><b>Quickest way:</b> open the site, click the toolbar icon and use <b>Pick thumbnail</b>, then open a video and use <b>Pick player</b>. <b>Check this page</b> shows what the rule matches, and suggests fixes. To do it by hand:</p>
         <ol>
           <li>Open the site, right-click a video thumbnail and choose <b>Inspect</b>.</li>
           <li>Find the box that is the size of the thumbnail image (not a text link) and write a CSS selector for it. If class names end in a random-looking hash, match the stable start, e.g. <code>[class*='VideoCard__thumb']</code>, and use <code>:has()</code> to require a video link inside, e.g. <code>div:has(&gt; a[href*='/video/'])</code>.</li>

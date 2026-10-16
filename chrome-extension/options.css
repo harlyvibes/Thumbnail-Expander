@@ -139,6 +139,7 @@ details[open] > summary .chevron { transform: rotate(90deg); }
 }
 
 .help summary::-webkit-details-marker { display: none; }
+.help .help-tip { margin: 0 18px 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--accent-soft); font-size: 13.5px; }
 .help ol { margin: 0; padding: 0 22px 4px 40px; }
 .help li { margin-bottom: 8px; }
 .help ul { margin-top: 6px; padding-left: 18px; }

@@ -27,6 +27,8 @@ const DEFAULT_SETTINGS = {
   version: SETTINGS_VERSION,
   enabled: true,
   autoplay: true,
+  // Logs to the console, outlines recognized thumbnails, and shows a status panel when expanding.
+  debug: false,
   sites: [
     {
       name: "YouTube",
@@ -89,6 +91,45 @@ function mergeSettings(saved) {
     version: SETTINGS_VERSION,
     enabled: saved.enabled ?? DEFAULT_SETTINGS.enabled,
     autoplay: saved.autoplay ?? DEFAULT_SETTINGS.autoplay,
+    debug: saved.debug ?? DEFAULT_SETTINGS.debug,
     sites
   };
+}
+
+// "www.vimeo.com" -> "Vimeo"
+function siteNameFromHost(hostname) {
+  const label = hostname.replace(/^www\./, "").split(".")[0] || hostname;
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+// A blank page-mode rule for a site, to be filled in from the settings page or the picker.
+function newSiteRule(hostname = "") {
+  const domain = hostname.replace(/^www\./, "");
+  return {
+    name: domain ? siteNameFromHost(domain) : "New site",
+    enabled: true,
+    hosts: domain,
+    thumbnail: "",
+    link: "",
+    mode: "page",
+    playerSelector: "",
+    idPattern: "",
+    embedUrl: ""
+  };
+}
+
+// Sets one selector on the rule for this hostname, creating the rule if there isn't one.
+// Picking a player only makes sense in page mode, so that also switches the rule to page mode.
+// Mutates settings; returns what changed so callers can describe it.
+function applyPickedSelector(settings, hostname, field, value) {
+  let rule = settings.sites.find((s) => ruleMatchesHost(s, hostname));
+  const created = !rule;
+  if (created) {
+    rule = newSiteRule(hostname);
+    settings.sites.push(rule);
+  }
+  rule[field] = value;
+  const switchedToPage = field === "playerSelector" && rule.mode !== "page";
+  if (switchedToPage) rule.mode = "page";
+  return { rule, created, switchedToPage };
 }
