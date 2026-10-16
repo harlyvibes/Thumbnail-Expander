@@ -2,9 +2,9 @@
 
 # Thumbnail Expander
 
-A Chrome extension that adds an expand button to the top-left corner of video thumbnails. Clicking it opens the video full-window over the page, without clicking into the video itself.
+A Chrome extension for sites that play a preview when you hover a video thumbnail. It adds an expand button to the top-left corner of each thumbnail. Clicking it blows that hover preview up to fill the browser window. Nothing new is loaded, so it never opens the video's page.
 
-Works on YouTube and Dailymotion out of the box. Other sites can be added from the settings page.
+Comes with rules for YouTube and Dailymotion. Other sites can be added from the toolbar popup or the settings page.
 
 ## Install (unpacked)
 
@@ -13,75 +13,58 @@ Works on YouTube and Dailymotion out of the box. Other sites can be added from t
 3. Turn on **Developer mode** (top right).
 4. Click **Load unpacked** and select the `chrome-extension` folder inside it.
 5. Pin the extension from Chrome's puzzle-piece menu so its icon stays in the toolbar.
-6. Open YouTube and hover over a thumbnail. The expand button appears in its top-left corner.
 
 ## Usage
 
-- Click the expand button on a thumbnail to open the video full-window.
-- Press **Esc** or the close button in the corner to close it.
-- Click the toolbar icon for quick switches: turn the extension or the current site on and off, toggle autoplay, or add the current site.
+1. Hover a thumbnail until the site starts its preview.
+2. Click the expand button in the thumbnail's top-left corner. The preview fills the window, exactly as the site plays it.
+3. Press **Esc** or the close button to put it back.
+
+While it's enlarged, clicks on the preview are blocked, so they can't open the video. If you click expand before the preview starts, it waits a few seconds for it.
+
+## How it works
+
+The extension doesn't copy or reload the preview. It restyles the site's own preview element to cover the window, and undoes anything that would keep it boxed in, such as transforms on the thumbnail card. The preview stays inside the thumbnail in the page, so the site still sees the mouse over the thumbnail and keeps playing it. Links around it are disabled until you close it. Closing puts every change back.
 
 ## Settings
 
-Click the toolbar icon and choose **Settings** (or `chrome://extensions` > Thumbnail Expander > **Extension options**).
+Click the toolbar icon for quick switches (the extension, the current site, debug mode), or choose **Settings** for the full list.
 
-- **Enable**: turn the extension on or off globally.
-- **Autoplay**: start the video as soon as it's expanded.
-- **Debug mode**: see [Debugging tools](#debugging-tools).
-- **Sites**: one rule per website. Click a site to edit it. Each rule has:
-  - **Domains**: where the rule applies (subdomains included).
-  - **Thumbnail selector**: CSS selector for the thumbnail element. The button is placed inside it.
-  - **Link selector** (optional): CSS selector for the element whose `href` points to the video. It is looked for inside the thumbnail first, then in the elements around it. Defaults to `a[href]`.
-  - **Playback mode** (also switchable from the toolbar popup):
-    - **Preview**: for sites that play a preview when you hover a thumbnail. Hover until the preview starts, then click expand: that same preview fills the window, exactly as the site plays it. Nothing new is loaded, so it never opens the video's page. Clicks on the enlarged preview are blocked so they can't open it either. Needs no other settings.
-    - **Page**: loads the video's own page in a full-window frame and hides everything except the player. Needs a **Player selector** (YouTube: `#movie_player`). Only works for links on the same site, and only on sites that allow their pages in frames.
-    - **Embed**: loads the site's embeddable player. Needs a **Video ID pattern** (regex, group 1 = the ID) and an **Embed URL** with `{id}` where the ID goes.
+Each site rule has:
 
-Changes from the popup apply immediately. Changes on the settings page apply when you click **Save changes**; open video pages update without a reload.
+- **Domains**: where the rule applies (subdomains included).
+- **Thumbnail selector**: CSS selector for the thumbnail element. The expand button is placed inside it.
+- **Preview selector** (optional): CSS selector for the element the site plays as the preview. Leave it empty to use whichever video (or player iframe) is playing over the thumbnail.
 
-## Why YouTube uses page mode
-
-YouTube refuses to play its embedded player on youtube.com itself ("This video is unavailable", error 152-4), for every video. So on YouTube the extension loads the normal watch page in a frame and enlarges its player instead. Side effects: it plays YouTube's usual ads, and the video counts as watched in your history, just like opening it normally.
-
-Dailymotion is the opposite: it refuses to show its pages in frames, but its embed player works, so it uses embed mode.
+Changes from the popup apply immediately. Changes on the settings page apply when you click **Save changes**. Open pages update without a reload.
 
 ## Adding a site
 
-The quickest way is with the picker:
+1. Open the site, click the toolbar icon, and choose **Pick thumbnail**. Point at a thumbnail and click. This creates a rule for the site with a thumbnail selector.
+2. Hover a thumbnail until its preview plays, and click the expand button. Usually that's all it takes.
+3. If it enlarges the wrong thing, or says no preview is playing, set the preview selector. Turn on **Debug mode**, hover a thumbnail until its preview plays, and press **Alt+Shift+P** with the mouse over the preview.
 
-1. Open the site's thumbnail page, click the toolbar icon, and choose **Pick thumbnail**. Point at a thumbnail and click. This creates a rule for the site with a thumbnail selector.
-2. Open one of its videos, click the toolbar icon, and choose **Pick player**. Point at the player and click.
-3. Go back to the thumbnails and try the expand button. If it doesn't work, use **Check this page** (see below).
-
-To do it by hand:
-
-1. Open the site and right-click a thumbnail, then choose **Inspect**.
-2. Find the element that wraps the thumbnail and note its tag, class, or id.
-3. Click the toolbar icon and choose **Add this site** (or **Add a site** on the settings page), then fill in the fields. Target the box that is the size of the thumbnail image, not a bare link: a selector like `a[href*='/video/']` also matches title text links. If class names end in a build hash, match the stable start (`[class*='VideoCard__thumb']`) and use `:has()` to require a video link inside (`div:has(> a[href*='/video/'])`).
-4. Save, reload the site, and hover a thumbnail.
+To write selectors by hand: right-click a thumbnail, choose **Inspect**, and find the box that is the size of the thumbnail image (not a text link). If class names end in a build hash, match the stable start, like `[class*='VideoCard__thumb']`. If an attribute ends in a number, match the start, like `[data-id^='SPW_']`.
 
 ## Debugging tools
 
-All in the toolbar popup:
+In the toolbar popup:
 
-- **Debug mode**: logs what the extension does to the browser console (filter it by `Thumbnail Expander`), outlines every thumbnail it recognized in purple, and keeps their buttons visible. When you expand a video, a panel in the top-left says what the player selector matched, whether the video is inside it, and suggests a better selector with a **Use** button.
-- **Check this page**: tests the site's rule against the open page and outlines what matches: thumbnails in purple, the player in red. It reports how many thumbnails matched and whether their video links were found, plus the embed URL in embed mode. On a video page, it reports whether the player selector contains the video, and suggests one with a **Use** button if it doesn't.
-- **Alt+Shift+P** (Option+Shift+P on Mac), in debug mode: on a video page, hover over the player and press it to save that player as the site's player selector, without opening the popup. If the player is in an iframe and you've clicked into it, click somewhere else on the page first so the shortcut reaches the page.
-- **Pick thumbnail** / **Pick player**: point at an element and click to save a selector for it. **↑**/**↓** move to the parent/child element, and **Esc** cancels. The label shows the selector it will use and how many elements on the page it matches.
+- **Debug mode**: outlines every recognized thumbnail in purple. While you hover one, the preview it would enlarge gets a red outline. When you expand, a panel in the top-left shows the thumbnail, the preview, and how it was found, with a button to save it as the preview selector. It also logs to the browser console (filter by `Thumbnail Expander`).
+- **Alt+Shift+P** (Option+Shift+P on Mac), in debug mode: hover a thumbnail until its preview plays, then press it with the mouse over the preview. The video under the mouse is saved as the site's preview selector. It finds the video by position, so it works even when the site makes the preview ignore the mouse.
+- **Check this page**: tests the site's rule against the open page. It outlines matching thumbnails and reports how many there are and how many have buttons. It also reports the preview selector and any previews showing right now.
+- **Pick thumbnail**: point at a thumbnail and click to save its selector. **↑**/**↓** move to the parent/child element, and **Esc** cancels.
 
 Common problems:
 
-- **Expanding opens the video's page (or counts as a visit)**: that's page mode. If the site plays previews on hover, switch it to **Preview** mode in the toolbar popup.
-- **"No preview is playing in this thumbnail"** (preview mode): hover the thumbnail until the site starts its preview, then click expand.
-
-- **Audio but no picture when expanded**: the player selector doesn't match the element around the video, so the video gets hidden. Open a video, then press **Alt+Shift+P** over the player (debug mode), or use **Check this page** or **Pick player**.
 - **No expand buttons**: the thumbnail selector matches nothing. Turn on debug mode to see the outlines, or use **Pick thumbnail**.
+- **"No preview is playing in this thumbnail"**: hover until the site starts its preview, then click expand. If the preview is playing and it still says this, set the preview selector with **Alt+Shift+P**.
+- **The wrong thing gets enlarged**: set the preview selector with **Alt+Shift+P** over the actual preview.
 - **"Reload the page and try again"** in the popup: the page was open before the extension was installed or reloaded.
 
 ## Notes
 
-- Some sites block their videos from playing in embedded players. In that case the overlay shows the site's own error message; try page mode for that site.
-- Ad thumbnails link to an ad server rather than a video, so they show a message instead of expanding.
+- The site has to play previews on hover; this enlarges that preview. It plays exactly as the site plays it, including whether it's muted.
 - The extension runs on all sites (`<all_urls>`) because you can add rules for any domain. It does nothing on a page unless a rule matches the domain.
-- Settings are stored with `chrome.storage.sync`, so they follow your Chrome profile. Settings saved by older versions are upgraded automatically.
+- Settings are stored with `chrome.storage.sync`, so they follow your Chrome profile. Settings saved by older versions are upgraded automatically. Only the thumbnail selectors carry over from the old page and embed modes.
 - The icons are generated by `tools/make_icons.py` (requires Pillow). Run `python tools/make_icons.py` from the repository root to regenerate them.

@@ -1,5 +1,5 @@
-// Debugging helpers for setting up site rules: selector suggestions, finding the player around a
-// video, highlighting matches, and a point-and-click element picker. Loaded before content.js;
+// Debugging helpers for setting up site rules: selector suggestions, finding the video under the
+// mouse, highlighting matches, and a point-and-click thumbnail picker. Loaded before content.js;
 // content scripts from one extension share their globals.
 
 // Attributes that never make a good selector (they describe content, not what the element is).
@@ -10,11 +10,11 @@ const TE_SKIP_ATTRS = new Set([
   "poster", "preload", "autoplay", "muted", "playsinline", "controls", "loop", "disabled"
 ]);
 
-// What counts as "the video" inside a player element.
-const TE_MEDIA = "video, iframe, canvas, embed, object";
+// Elements a preview can be: a video, or a site's player in an iframe.
+const TE_PREVIEW_MEDIA = "video, iframe";
 
 // Elements that can't hold the expand button (it's added as a child).
-const TE_NO_CHILDREN = "img, picture, svg, input, " + TE_MEDIA;
+const TE_NO_CHILDREN = "img, picture, svg, input, video, iframe, canvas, embed, object";
 
 // Does this id/class/attribute value look machine-generated, and so likely to change when the
 // site updates? (e.g. "SPW_123456789", "css-1x2y3z", "Component-sPPW")
@@ -79,7 +79,8 @@ function teSelectorCandidates(el) {
 
 // Best selector for an element.
 //   kind "thumbnail": should match this element and the other thumbnails like it (many matches).
-//   kind "player":    should match just this element.
+//   kind "preview":   should match this preview video and as little else as possible. Previews
+//                     only exist while hovering, so there's usually just one on the page.
 // Returns { sel, count, rank }.
 function teSuggestSelector(el, kind) {
   const doc = el.ownerDocument;
@@ -92,8 +93,8 @@ function teSuggestSelector(el, kind) {
       // Not valid CSS for this browser; skip it.
     }
   }
-  if (kind === "player") {
-    scored.sort((a, b) => (a.count === 1 ? 0 : 1) - (b.count === 1 ? 0 : 1) || a.rank - b.rank || a.count - b.count);
+  if (kind === "preview") {
+    scored.sort((a, b) => a.count - b.count || a.rank - b.rank);
   } else {
     scored.sort((a, b) => (a.count > 1 ? 0 : 1) - (b.count > 1 ? 0 : 1) || a.rank - b.rank || b.count - a.count);
   }
@@ -101,9 +102,8 @@ function teSuggestSelector(el, kind) {
 }
 
 // From an element (an image under the cursor, say), climb to the outermost ancestor that is still
-// the same size: the box the size of the image or video. Collapsed wrappers (inline links, or
-// YouTube's zero-height box around its absolutely positioned video) are skipped over rather than
-// stopping the climb.
+// the same size: the box the size of the image. Collapsed wrappers (inline links, zero-height
+// boxes) are skipped over rather than stopping the climb.
 function teSameSizeChain(el) {
   const base = el.getBoundingClientRect();
   // Allow for borders, padding and rounding: 8px or 5%, whichever is larger.
@@ -131,64 +131,26 @@ function teButtonHost(el) {
   return host || el;
 }
 
-// From a video (or anything inside the player), find the element that holds both the video and
-// its controls: the innermost same-size ancestor that has controls in it and a unique selector.
-function tePlayerElementFor(el) {
-  const hasControls = (e) =>
-    !!e.querySelector('button, [role="button"], input[type="range"], [class*="control" i]');
-  const chain = teSameSizeChain(el).filter((e) => !e.matches(TE_MEDIA));
-  if (!chain.length) {
-    // Nothing around the video is the same size: take the nearest ancestor with controls.
-    for (let p = el.parentElement; p && p !== el.ownerDocument.body; p = p.parentElement) {
-      if (hasControls(p)) return p;
-    }
-    return el.parentElement || el;
-  }
-  const scored = chain.map((e) => ({ e, s: teSuggestSelector(e, "player"), controls: hasControls(e) }));
-  const pick =
-    scored.find((x) => x.controls && x.s?.count === 1 && x.s.rank <= 1) ||
-    scored.find((x) => x.controls && x.s?.count === 1) ||
-    scored.find((x) => x.s?.count === 1) ||
-    scored[scored.length - 1];
-  return pick.e;
-}
-
-// The video (or player iframe) under the mouse, starting from the hovered element. Hovering a
-// player usually lands on one of its controls, so this walks up from "the play button" until it
-// finds a sizeable video. With a mouse position, the video must be under it (with a margin for
-// control bars drawn just outside the picture), so hovering elsewhere on the page finds nothing.
-function teMediaNear(el, point) {
-  const usable = (m) => {
+// The video (or player iframe) at a point on the page: the smallest one covering it. Found by
+// position rather than by what's hovered, because sites often make previews ignore the mouse
+// (pointer-events: none) so clicks reach the link underneath.
+function teVideoAt(point, doc = document) {
+  let best = null;
+  let bestArea = Infinity;
+  for (const m of doc.querySelectorAll(TE_PREVIEW_MEDIA)) {
     const r = m.getBoundingClientRect();
-    if (r.width < 150 || r.height < 80) return false;
-    if (!point) return true;
-    const mx = 8;
-    const my = Math.max(24, r.height * 0.15);
-    return point.x >= r.left - mx && point.x <= r.right + mx && point.y >= r.top - my && point.y <= r.bottom + my;
-  };
-  for (let e = el; e && e !== e.ownerDocument.body; e = e.parentElement) {
-    if (e.matches("video, iframe") && usable(e)) return e;
-    const inside = [...e.querySelectorAll("video, iframe")].find(usable);
-    if (inside) return inside;
+    if (r.width < 50 || r.height < 30) continue;
+    if (point.x < r.left || point.x > r.right || point.y < r.top || point.y > r.bottom) continue;
+    const area = r.width * r.height;
+    if (area < bestArea) {
+      best = m;
+      bestArea = area;
+    }
   }
-  return null;
+  return best;
 }
 
-// The biggest visible video on the page, or failing that the biggest large iframe (a player
-// embedded from another domain).
-function teFindMainMedia(doc = document) {
-  const area = (e) => {
-    const r = e.getBoundingClientRect();
-    return r.width * r.height;
-  };
-  const biggest = (list) => list.filter((e) => area(e) > 0).sort((a, b) => area(b) - area(a))[0] || null;
-  return (
-    biggest([...doc.querySelectorAll("video")]) ||
-    biggest([...doc.querySelectorAll("iframe")].filter((f) => f.getBoundingClientRect().width >= 200))
-  );
-}
-
-// "div#player.video-box 640×360" for logs and labels.
+// "video.preview-player 320×180" for logs and labels.
 function teDescribe(el) {
   if (!el) return "(none)";
   const r = el.getBoundingClientRect();
@@ -196,18 +158,18 @@ function teDescribe(el) {
   return `${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${cls} ${Math.round(r.width)}×${Math.round(r.height)}`;
 }
 
-// Outlines elements for a few seconds.
+// Outlines elements for a few seconds: thumbnails in purple, previews in red.
 function teHighlight(elements, kind, ms = 4000) {
-  const cls = kind === "player" ? "te-hl-player" : "te-hl-thumb";
+  const cls = kind === "preview" ? "te-hl-preview" : "te-hl-thumb";
   const list = [...elements].slice(0, 300);
   list.forEach((el) => el.classList.add(cls));
   setTimeout(() => list.forEach((el) => el.classList.remove(cls)), ms);
 }
 
-// Lets the user point at an element on the page. A transparent layer catches the mouse (so links
-// don't fire and players in iframes can be picked too); the element underneath is found by
-// position. Arrow keys move to the parent/child. Resolves with the chosen element, or null on Esc.
-function tePickElement({ kind, title }) {
+// Lets the user point at a thumbnail on the page. A transparent layer catches the mouse (so links
+// don't fire); the element underneath is found by position. Arrow keys move to the parent/child.
+// Resolves with the chosen element, or null on Esc.
+function tePickElement({ title }) {
   return new Promise((resolve) => {
     const make = (cls) => {
       const el = document.createElement("div");
@@ -236,7 +198,7 @@ function tePickElement({ kind, title }) {
       if (!current) return;
       const r = current.getBoundingClientRect();
       Object.assign(box.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" });
-      const s = teSuggestSelector(current, kind);
+      const s = teSuggestSelector(teButtonHost(current), "thumbnail");
       label.textContent = `${s ? s.sel : current.tagName.toLowerCase()}  ·  ${s ? s.count : "?"} on page  ·  ${Math.round(r.width)}×${Math.round(r.height)}`;
       label.style.left = Math.max(4, r.left) + "px";
       label.style.top = (r.top > 34 ? r.top - 30 : Math.min(innerHeight - 30, r.bottom + 6)) + "px";
@@ -250,7 +212,7 @@ function tePickElement({ kind, title }) {
       if (!el || el === under) return;
       under = el;
       downStack.length = 0;
-      current = kind === "player" ? tePlayerElementFor(el) : teThumbnailElementFor(el);
+      current = teThumbnailElementFor(el);
       show();
     };
 

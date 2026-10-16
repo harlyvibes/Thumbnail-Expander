@@ -1,18 +1,12 @@
-// Settings page: general toggles and per-site rules.
+// Settings page: general switches and per-site rules.
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const sitesEl = $("#sites");
   const statusEl = $("#status");
   const template = $("#site-template");
 
-  const TEXT_FIELDS = ["name", "hosts", "thumbnail", "link", "playerSelector", "idPattern", "embedUrl"];
-  const MODE_HINTS = {
-    preview: "Enlarges the preview the site plays when you hover a thumbnail. Nothing new is loaded, so it never opens the video's page. Hover until the preview starts, then click expand.",
-    page: "Loads the video's own page full-window and hides everything but the player. Use this when the site blocks embedding. Only works for links on the same site.",
-    embed: "Loads the site's embeddable player, built from the video ID in the link."
-  };
+  const TEXT_FIELDS = ["name", "hosts", "thumbnail", "preview"];
 
-  let cardCount = 0;
   let dirty = false;
 
   init();
@@ -44,28 +38,18 @@
 
   function render(settings) {
     $("#enabled").checked = settings.enabled;
-    $("#autoplay").checked = settings.autoplay;
     $("#debug").checked = settings.debug;
     sitesEl.textContent = "";
     settings.sites.forEach((site) => addSiteCard(site));
   }
 
   function addSiteCard(site, { open = false } = {}) {
-    const n = ++cardCount;
     const card = template.content.firstElementChild.cloneNode(true);
 
     for (const key of TEXT_FIELDS) {
       card.querySelector(`[data-key="${key}"]`).value = site[key] ?? "";
     }
     card.querySelector('[data-key="enabled"]').checked = site.enabled !== false;
-
-    // Radio groups need unique names/ids per card.
-    card.querySelectorAll("[data-mode]").forEach((radio) => {
-      radio.name = `mode-${n}`;
-      radio.id = `mode-${n}-${radio.value}`;
-      radio.nextElementSibling.htmlFor = radio.id;
-      radio.checked = radio.value === (site.mode || "embed");
-    });
 
     card.open = open;
     card.querySelector("[data-remove]").addEventListener("click", () => {
@@ -80,11 +64,11 @@
     return card;
   }
 
-  // Keeps the collapsed card's summary (avatar, name, domains, mode) in sync with its fields.
+  // Keeps the collapsed card's summary (avatar, name, domains, preview) in sync with its fields.
   function updateHeader(card) {
     const name = card.querySelector('[data-key="name"]').value.trim() || "Unnamed site";
     const hosts = card.querySelector('[data-key="hosts"]').value.trim();
-    const mode = card.querySelector("[data-mode]:checked")?.value || "embed";
+    const previewSel = card.querySelector('[data-key="preview"]').value.trim();
     const enabled = card.querySelector('[data-key="enabled"]').checked;
 
     const avatar = card.querySelector("[data-avatar]");
@@ -93,9 +77,7 @@
 
     card.querySelector("[data-name]").textContent = name;
     card.querySelector("[data-hosts]").textContent = hosts || "No domain yet";
-    card.querySelector("[data-mode-badge]").textContent = { preview: "Preview mode", page: "Page mode", embed: "Embed mode" }[mode];
-    card.querySelector("[data-mode-hint]").textContent = MODE_HINTS[mode];
-    card.dataset.mode = mode;
+    card.querySelector("[data-preview-badge]").textContent = previewSel ? "Custom preview" : "Auto preview";
     card.classList.toggle("disabled", !enabled);
   }
 
@@ -116,10 +98,7 @@
 
   function readSites() {
     return [...sitesEl.querySelectorAll(".site")].map((card) => {
-      const site = {
-        enabled: card.querySelector('[data-key="enabled"]').checked,
-        mode: card.querySelector("[data-mode]:checked")?.value || "embed"
-      };
+      const site = { enabled: card.querySelector('[data-key="enabled"]').checked };
       for (const key of TEXT_FIELDS) {
         site[key] = card.querySelector(`[data-key="${key}"]`).value.trim();
       }
@@ -145,22 +124,7 @@
       if (!site.hosts) return fail("hosts", "add at least one domain.");
       if (!site.thumbnail) return fail("thumbnail", "the thumbnail selector is required.");
       if (!isSelector(site.thumbnail)) return fail("thumbnail", "the thumbnail selector isn't valid CSS.");
-      if (site.link && !isSelector(site.link)) return fail("link", "the link selector isn't valid CSS.");
-
-      if (site.mode === "preview") {
-        // Nothing else to check: the preview is found on the page when you click expand.
-      } else if (site.mode === "page") {
-        if (!site.playerSelector) return fail("playerSelector", "page mode needs a player selector.");
-        if (!isSelector(site.playerSelector)) return fail("playerSelector", "the player selector isn't valid CSS.");
-      } else {
-        if (!site.idPattern) return fail("idPattern", "embed mode needs a video ID pattern.");
-        try {
-          new RegExp(site.idPattern);
-        } catch {
-          return fail("idPattern", "the video ID pattern isn't a valid regex.");
-        }
-        if (!site.embedUrl.includes("{id}")) return fail("embedUrl", "the embed URL must contain {id}.");
-      }
+      if (site.preview && !isSelector(site.preview)) return fail("preview", "the preview selector isn't valid CSS.");
     }
     return null;
   }
@@ -197,12 +161,11 @@
     const settings = {
       version: SETTINGS_VERSION,
       enabled: $("#enabled").checked,
-      autoplay: $("#autoplay").checked,
       debug: $("#debug").checked,
       sites
     };
     await chrome.storage.sync.set({ settings });
-    setStatus("ok", "Saved. Open video pages update automatically.");
+    setStatus("ok", "Saved. Open pages update automatically.");
   });
 
   $("#add-site").addEventListener("click", () => addNewSite());
