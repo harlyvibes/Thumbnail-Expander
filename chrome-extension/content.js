@@ -330,6 +330,8 @@
     hideScrollbars(restore);
     // Take keyboard focus off the expand button underneath, so keys can't press it again.
     if (document.activeElement?.classList.contains(BUTTON_CLASS)) document.activeElement.blur();
+    // The cursor hides once the mouse has rested a moment (see revealControls).
+    restartIdleTimer(preview);
     return true;
   }
 
@@ -354,8 +356,9 @@
     if (bodyScrolls) hide(body);
   }
 
-  // The close button is hidden until the mouse moves over the enlarged preview, and hides again
-  // once the mouse rests (unless it's resting on the button).
+  // Like a video player, the close button and the mouse cursor show while the mouse moves over
+  // the enlarged preview and hide once it rests (unless it's resting on the button). The close
+  // button starts out hidden; the cursor hides after the first rest.
   function revealControls() {
     const p = preview;
     if (!p.moved) {
@@ -363,13 +366,23 @@
       if (p.anchor && Math.hypot(lastMouse.x - p.anchor.x, lastMouse.y - p.anchor.y) < 4) return;
       p.moved = true;
     }
-    p.ui.classList.remove("te-idle");
+    setIdle(p, false);
+    restartIdleTimer(p);
+  }
+
+  function restartIdleTimer(p) {
     clearTimeout(p.idleTimer);
     p.idleTimer = setTimeout(function hide() {
       if (preview !== p) return;
       if (p.ui.querySelector(".te-close:hover")) p.idleTimer = setTimeout(hide, CONTROLS_IDLE_MS);
-      else p.ui.classList.add("te-idle");
+      else setIdle(p, true);
     }, CONTROLS_IDLE_MS);
+  }
+
+  // content.css hides the close button (te-idle) and the cursor over the preview ("idle").
+  function setIdle(p, idle) {
+    p.ui.classList.toggle("te-idle", idle);
+    p.media.setAttribute(ENLARGED_ATTR, idle ? "idle" : "");
   }
 
   // Puts the enlarged preview in the top layer, with the close button above it. Called again

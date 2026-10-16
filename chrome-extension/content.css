@@ -131,7 +131,12 @@
   transition: opacity 0.25s ease, background 0.15s ease, transform 0.15s ease;
 }
 
-/* Hidden until the mouse moves, and again once it rests (see revealControls in content.js) */
+/* The cursor over the preview, and the close button, hide while the mouse rests (see
+   revealControls in content.js). The close button also starts out hidden. */
+[data-te-enlarged="idle"]:not(#te-x):not(#te-x):not(#te-x) {
+  cursor: none !important;
+}
+
 #te-preview-ui.te-idle .te-close {
   opacity: 0;
   pointer-events: none;
