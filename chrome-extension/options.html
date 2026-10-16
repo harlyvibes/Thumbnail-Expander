@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thumbnail Expander Settings</title>
+  <link rel="icon" href="icons/icon32.png">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <img class="logo" src="icons/icon128.png" alt="" width="44" height="44">
+      <div class="topbar-text">
+        <h1>Thumbnail Expander</h1>
+        <p class="muted">Watch any thumbnail full-window without leaving the page.</p>
+      </div>
+      <span class="badge" id="version"></span>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2 class="section-title">General</h2>
+      <div class="card">
+        <label class="row">
+          <span>
+            <span class="row-title">Enable Thumbnail Expander</span>
+            <span class="row-desc">Show the expand button on video thumbnails.</span>
+          </span>
+          <input type="checkbox" class="switch" id="enabled">
+        </label>
+        <label class="row">
+          <span>
+            <span class="row-title">Autoplay</span>
+            <span class="row-desc">Start playing as soon as the video is expanded.</span>
+          </span>
+          <input type="checkbox" class="switch" id="autoplay">
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2 class="section-title">Sites</h2>
+        <span class="muted">Where to find thumbnails, and how to play them.</span>
+      </div>
+      <div id="sites" class="sites"></div>
+      <button type="button" class="add-site" id="add-site">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add a site
+      </button>
+    </section>
+
+    <section>
+      <details class="card help">
+        <summary>
+          <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          How to add a site
+        </summary>
+        <ol>
+          <li>Open the site, right-click a video thumbnail and choose <b>Inspect</b>.</li>
+          <li>Find the box that is the size of the thumbnail image (not a text link) and write a CSS selector for it. If class names end in a random-looking hash, match the stable start, e.g. <code>[class*='VideoCard__thumb']</code>, and use <code>:has()</code> to require a video link inside, e.g. <code>div:has(&gt; a[href*='/video/'])</code>.</li>
+          <li>If the video link isn't found automatically, set <b>Link selector</b>. It's looked for inside the thumbnail first, then in the elements around it.</li>
+          <li>Pick a <b>Playback mode</b>:
+            <ul>
+              <li><b>Page</b> (try this first): loads the video's own page full-window and hides everything but the player. Inspect the player on a video page and set <b>Player selector</b> to the element holding the video and its controls (YouTube: <code>#movie_player</code>). Some sites, like Dailymotion, refuse to be shown this way.</li>
+              <li><b>Embed</b>: uses the site's embeddable player. Set a <b>Video ID pattern</b> whose first group captures the ID from the link (for <code>/video/x8abc12</code>: <code>/video/([A-Za-z0-9]+)</code>) and an <b>Embed URL</b> with <code>{id}</code> where the ID goes.</li>
+            </ul>
+          </li>
+          <li>Save, then reload the site.</li>
+        </ol>
+        <p class="muted">"Video unavailable" in embed mode means the site refuses embeds on its own pages (YouTube does this). Switch that site to page mode.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="savebar">
+    <div class="savebar-inner">
+      <span id="status" class="status" role="status"></span>
+      <button type="button" class="btn btn-ghost" id="reset">Reset to defaults</button>
+      <button type="button" class="btn btn-primary" id="save">Save changes</button>
+    </div>
+  </footer>
+
+  <template id="site-template">
+    <details class="card site">
+      <summary class="site-head">
+        <span class="avatar" data-avatar></span>
+        <span class="site-title">
+          <span class="site-name" data-name></span>
+          <span class="site-hosts" data-hosts></span>
+        </span>
+        <span class="badge badge-accent" data-mode-badge></span>
+        <input type="checkbox" class="switch" data-key="enabled" title="Enable this site" aria-label="Enable this site">
+        <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </summary>
+      <div class="site-body">
+        <div class="grid">
+          <label class="field">
+            <span class="field-label">Name</span>
+            <input class="input" data-key="name" spellcheck="false">
+          </label>
+          <label class="field">
+            <span class="field-label">Domains</span>
+            <input class="input mono" data-key="hosts" placeholder="example.com" spellcheck="false">
+            <span class="field-hint">Comma-separated. Subdomains are included.</span>
+          </label>
+          <label class="field full">
+            <span class="field-label">Thumbnail selector</span>
+            <input class="input mono" data-key="thumbnail" spellcheck="false">
+            <span class="field-hint">The element the button goes in: the box the size of the thumbnail image.</span>
+          </label>
+          <label class="field full">
+            <span class="field-label">Link selector <span class="optional">optional</span></span>
+            <input class="input mono" data-key="link" placeholder="a[href]" spellcheck="false">
+          </label>
+          <div class="field full">
+            <span class="field-label">Playback mode</span>
+            <div class="segmented" role="radiogroup" aria-label="Playback mode">
+              <input type="radio" data-mode value="page"><label>Page</label>
+              <input type="radio" data-mode value="embed"><label>Embed</label>
+            </div>
+            <span class="field-hint" data-mode-hint></span>
+          </div>
+          <label class="field full only-page">
+            <span class="field-label">Player selector</span>
+            <input class="input mono" data-key="playerSelector" spellcheck="false">
+            <span class="field-hint">The element on the video page that holds the video and its controls.</span>
+          </label>
+          <label class="field only-embed">
+            <span class="field-label">Video ID pattern</span>
+            <input class="input mono" data-key="idPattern" spellcheck="false">
+            <span class="field-hint">Regex. Group 1 captures the ID from the link.</span>
+          </label>
+          <label class="field only-embed">
+            <span class="field-label">Embed URL</span>
+            <input class="input mono" data-key="embedUrl" spellcheck="false">
+            <span class="field-hint"><code>{id}</code> is replaced with the video ID.</span>
+          </label>
+        </div>
+        <div class="site-actions">
+          <button type="button" class="btn btn-danger" data-remove>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Remove site
+          </button>
+        </div>
+      </div>
+    </details>
+  </template>
+
+  <script src="defaults.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

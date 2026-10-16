@@ -1,0 +1,208 @@
+/* Styles injected into video sites. Everything is scoped to te- classes/ids, and the button
+   starts from `all: initial` so the site's own button styles can't leak into it. */
+
+/* ---------- Expand button (top-left corner of a thumbnail) ---------- */
+
+.te-expand-btn {
+  all: initial;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(18, 18, 24, 0.55);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.16s ease, transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.te-expand-btn svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+/* Show on hover of the thumbnail, and keep it reachable for keyboard users */
+*:hover > .te-expand-btn,
+.te-expand-btn:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.te-expand-btn:hover {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.08);
+}
+
+.te-expand-btn:active {
+  transform: scale(0.96);
+}
+
+.te-expand-btn:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+}
+
+/* ---------- Full-window overlay ---------- */
+
+#te-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #fff;
+  animation: te-fade-in 0.18s ease-out;
+}
+
+#te-overlay .te-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Page mode keeps the frame hidden until its player has been enlarged */
+#te-overlay .te-frame.te-loading {
+  opacity: 0;
+}
+
+/* Close button and Esc hint */
+#te-overlay .te-close {
+  all: initial;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(18, 18, 24, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+#te-overlay .te-close svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+#te-overlay .te-close:hover {
+  background: rgba(239, 68, 68, 0.9);
+  transform: scale(1.06);
+}
+
+#te-overlay .te-close:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+}
+
+#te-overlay .te-hint {
+  position: absolute;
+  top: 22px;
+  right: 64px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(18, 18, 24, 0.7);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+  animation: te-hint 2.8s ease forwards;
+}
+
+#te-overlay .te-hint kbd {
+  font: 600 11px/1 system-ui, sans-serif;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Loading spinner */
+#te-overlay .te-spinner-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+#te-overlay .te-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg, #6366f1 120deg, #a855f7 300deg, transparent 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  animation: te-spin 0.8s linear infinite;
+}
+
+/* Error message */
+#te-overlay .te-message {
+  max-width: 520px;
+  margin: 24px;
+  padding: 20px 24px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+html.te-locked,
+html.te-locked body {
+  overflow: hidden !important;
+}
+
+@keyframes te-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes te-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes te-hint {
+  0%, 75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .te-expand-btn,
+  #te-overlay,
+  #te-overlay .te-close {
+    transition: none;
+    animation: none;
+  }
+}
