@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Thumbnail Expander",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "description": "Adds an expand button to video thumbnails that blows the hover preview up to fill the window, without opening the video.",
   "icons": {
     "16": "icons/icon16.png",
@@ -14,6 +14,17 @@
     "activeTab"
   ],
   "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "sound-lock.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    },
     {
       "matches": [
         "<all_urls>"

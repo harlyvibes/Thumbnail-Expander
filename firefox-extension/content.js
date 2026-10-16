@@ -8,6 +8,8 @@
   const HOST_ATTR = "data-te-host";
   // Marks the enlarged preview; content.css sizes it to the window.
   const ENLARGED_ATTR = "data-te-enlarged";
+  // While set on a preview, the site can't change its volume or mute (see sound-lock.js).
+  const SOUND_LOCK_ATTR = "data-te-sound-lock";
   const WAIT_FOR_PREVIEW_MS = 5000;
   // The close button on an enlarged preview hides after the mouse rests this long.
   const CONTROLS_IDLE_MS = 2500;
@@ -525,6 +527,8 @@
     const setLevel = (v, reveal = true) => {
       changed = true;
       wanted = Math.min(1, Math.max(0, v));
+      // From now on the site can't change the sound (it would drag the slider back).
+      media.setAttribute(SOUND_LOCK_ATTR, "");
       apply(wanted);
       show(wanted);
       // Using the control counts as moving the mouse: keep the controls up.
@@ -534,10 +538,11 @@
       }
     };
 
-    // Some sites reset a preview's sound when it changes (keeping previews muted, say), which
-    // would drag the slider back to zero. Once the control has been used, its level wins: the
-    // site no longer hears that the sound changed, and if it changes the sound anyway, the level
-    // is put back. If it keeps at it, give up rather than fight forever.
+    // Some sites reset a preview's sound (keeping previews muted, or at their own volume), which
+    // would drag the slider back. Once the control has been used, its level wins: sound-lock.js
+    // stops the site's changes, and the site no longer hears that the sound changed. Should a
+    // change get through anyway, the level is put back; if that keeps happening, give up rather
+    // than fight forever.
     const onVolumeChange = (e) => {
       if (e.target !== media) return;
       if (wanted !== null) {
@@ -553,6 +558,7 @@
           }
           log("The site keeps changing the preview's sound; leaving it to the site.");
           wanted = null;
+          media.removeAttribute(SOUND_LOCK_ATTR);
         }
       }
       show(level());
@@ -571,6 +577,7 @@
     window.addEventListener("volumechange", onVolumeChange, true);
     restore.push(() => {
       window.removeEventListener("volumechange", onVolumeChange, true);
+      media.removeAttribute(SOUND_LOCK_ATTR);
       if (!changed) return;
       media.volume = before.volume;
       media.muted = before.muted;
