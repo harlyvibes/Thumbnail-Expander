@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thumbnail Expander Settings</title>
+  <link rel="icon" href="icons/icon32.png">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <img class="logo" src="icons/icon128.png" alt="" width="44" height="44">
+      <div class="topbar-text">
+        <h1>Thumbnail Expander</h1>
+        <p class="muted">Blow a thumbnail's hover preview up to fill the window, without opening the video.</p>
+      </div>
+      <span class="badge" id="version"></span>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2 class="section-title">General</h2>
+      <div class="card">
+        <label class="row">
+          <span>
+            <span class="row-title">Enable Thumbnail Expander</span>
+            <span class="row-desc">Show the expand button on video thumbnails.</span>
+          </span>
+          <input type="checkbox" class="switch" id="enabled">
+        </label>
+        <label class="row">
+          <span>
+            <span class="row-title">Debug mode</span>
+            <span class="row-desc">Outline recognized thumbnails, outline the preview found while you hover one, show what was found when you expand, and log to the browser console. Hover a playing preview and press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> to save it as the site's preview.</span>
+          </span>
+          <input type="checkbox" class="switch" id="debug">
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2 class="section-title">Sites</h2>
+        <span class="muted">Where to find thumbnails, and which element is the preview.</span>
+      </div>
+      <div id="sites" class="sites"></div>
+      <button type="button" class="add-site" id="add-site">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add a site
+      </button>
+    </section>
+
+    <section>
+      <details class="card help">
+        <summary>
+          <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          How to add a site
+        </summary>
+        <p class="help-tip"><b>Quickest way:</b> open the site, click the toolbar icon and use <b>Pick thumbnail</b>. Then hover a thumbnail until its preview plays and click the expand button. Usually that's all it takes.</p>
+        <ol>
+          <li><b>Thumbnails.</b> Right-click a thumbnail, choose <b>Inspect</b>, and find the box that is the size of the thumbnail image (not a text link). Write a CSS selector for it. If class names end in a random-looking hash, match the stable start, e.g. <code>[class*='VideoCard__thumb']</code>. If an attribute ends in a number, match the start, e.g. <code>[data-id^='SPW_']</code>.</li>
+          <li><b>Preview</b> (optional). By default the extension enlarges whichever video is playing over the thumbnail. If it picks the wrong thing, turn on <b>Debug mode</b>, hover a thumbnail until its preview plays, and press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> with the mouse over it. That saves the preview selector for you.</li>
+          <li>Save. Open pages update straight away.</li>
+        </ol>
+        <p class="muted">The site has to play previews when you hover its thumbnails; this enlarges that preview, so it never opens the video's page.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="savebar">
+    <div class="savebar-inner">
+      <span id="status" class="status" role="status"></span>
+      <button type="button" class="btn btn-ghost" id="reset">Reset to defaults</button>
+      <button type="button" class="btn btn-primary" id="save">Save changes</button>
+    </div>
+  </footer>
+
+  <template id="site-template">
+    <details class="card site">
+      <summary class="site-head">
+        <span class="avatar" data-avatar></span>
+        <span class="site-title">
+          <span class="site-name" data-name></span>
+          <span class="site-hosts" data-hosts></span>
+        </span>
+        <span class="badge badge-accent" data-preview-badge></span>
+        <input type="checkbox" class="switch" data-key="enabled" title="Enable this site" aria-label="Enable this site">
+        <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </summary>
+      <div class="site-body">
+        <div class="grid">
+          <label class="field">
+            <span class="field-label">Name</span>
+            <input class="input" data-key="name" spellcheck="false">
+          </label>
+          <label class="field">
+            <span class="field-label">Domains</span>
+            <input class="input mono" data-key="hosts" placeholder="example.com" spellcheck="false">
+            <span class="field-hint">Comma-separated. Subdomains are included.</span>
+          </label>
+          <label class="field full">
+            <span class="field-label">Thumbnail selector</span>
+            <input class="input mono" data-key="thumbnail" spellcheck="false">
+            <span class="field-hint">The element the button goes in: the box the size of the thumbnail image.</span>
+          </label>
+          <label class="field full">
+            <span class="field-label">Preview selector <span class="optional">optional</span></span>
+            <input class="input mono" data-key="preview" placeholder="Auto: the video playing over the thumbnail" spellcheck="false">
+            <span class="field-hint">The element the site plays as the hover preview. Leave empty to use whichever video is playing over the thumbnail.</span>
+          </label>
+        </div>
+        <div class="site-actions">
+          <button type="button" class="btn btn-danger" data-remove>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Remove site
+          </button>
+        </div>
+      </div>
+    </details>
+  </template>
+
+  <script src="defaults.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

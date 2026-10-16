@@ -9,6 +9,10 @@
 //   preview   - optional CSS selector for the preview video. Empty: use whichever video (or player
 //               iframe) is playing over the thumbnail when you click expand.
 
+// The extension API: browser.* in Firefox, chrome.* in Chrome. Both return promises, so the code
+// below uses them that way (never callbacks) and runs unchanged in either browser.
+const ext = globalThis.browser?.runtime ? globalThis.browser : globalThis.chrome;
+
 const SETTINGS_VERSION = 4;
 
 // Dailymotion wraps each thumbnail in a fixed-ratio box whose direct child is the video link.

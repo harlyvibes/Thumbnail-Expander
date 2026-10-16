@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Thumbnail Expander</title>
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="head">
+    <img src="icons/icon48.png" alt="" width="32" height="32">
+    <div>
+      <h1>Thumbnail Expander</h1>
+      <p class="muted">Blow hover previews up to full window</p>
+    </div>
+  </header>
+
+  <div class="card">
+    <label class="row">
+      <span class="row-title">Enabled</span>
+      <input type="checkbox" class="switch" id="enabled">
+    </label>
+  </div>
+
+  <!-- data-state: "rule" (a rule matches this tab), "norule" (web page, no rule), "nopage" (not a web page) -->
+  <div class="card site" id="site" data-state="nopage">
+    <div class="state-rule">
+      <label class="row">
+        <span class="site-info">
+          <span class="row-title">On <span id="rule-name"></span></span>
+          <span class="row-desc" id="rule-host"></span>
+        </span>
+        <input type="checkbox" class="switch" id="site-enabled">
+      </label>
+      <p class="preview-info">Preview: <code id="preview-sel"></code></p>
+    </div>
+    <div class="state-norule">
+      <p class="site-msg">No rule for <b id="host"></b> yet.</p>
+      <button type="button" class="btn btn-block" id="add-site">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add this site
+      </button>
+    </div>
+    <div class="state-nopage">
+      <p class="site-msg muted">Open a video site like YouTube or Dailymotion to use the expand button.</p>
+    </div>
+  </div>
+
+  <!-- Debug tools for setting up a site's rule. Hidden when the tab isn't a web page. -->
+  <div class="card debug" id="debug">
+    <label class="row">
+      <span class="site-info">
+        <span class="row-title">Debug mode</span>
+        <span class="row-desc plain">Shows what it finds as you hover</span>
+      </span>
+      <input type="checkbox" class="switch" id="debug-mode">
+    </label>
+    <div class="debug-tools">
+      <div class="pick-row">
+        <button type="button" class="btn" id="check">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35"/></svg>
+          Check this page
+        </button>
+        <button type="button" class="btn" id="pick-thumbnail">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l7 17 2.5-7.5L20 10z"/></svg>
+          Pick thumbnail
+        </button>
+      </div>
+      <p class="shortcut-hint">To set the preview: with debug mode on, hover a thumbnail until its preview plays, then press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> with the mouse over it.</p>
+      <ul class="report" id="report" hidden></ul>
+    </div>
+  </div>
+
+  <button type="button" class="btn btn-ghost btn-block" id="settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    Settings
+  </button>
+
+  <script src="defaults.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -46,7 +46,7 @@
     window.addEventListener("mousemove", onMouseMove, { capture: true, passive: true });
 
     // Requests from the toolbar popup's debug tools.
-    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg?.type === "te-check") {
         sendResponse(checkPage());
       } else if (msg?.type === "te-pick") {
@@ -55,7 +55,7 @@
       }
     });
 
-    chrome.storage.onChanged.addListener((changes, area) => {
+    ext.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync") return;
       // Remove existing buttons so they are rebuilt with the new rules.
       document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((b) => b.remove());
@@ -68,10 +68,9 @@
     });
   }
 
-  function loadSettings() {
-    return new Promise((resolve) => {
-      chrome.storage.sync.get(["settings"], (data) => resolve(mergeSettings(data.settings)));
-    });
+  async function loadSettings() {
+    const data = await ext.storage.sync.get(["settings"]);
+    return mergeSettings(data.settings);
   }
 
   function applySettings() {
@@ -571,10 +570,10 @@
 
   // Saves a selector into this site's rule (creating the rule if needed).
   async function saveSelector(field, value) {
-    const data = await chrome.storage.sync.get(["settings"]);
+    const data = await ext.storage.sync.get(["settings"]);
     const updated = mergeSettings(data.settings);
     const result = applyPickedSelector(updated, location.hostname, field, value);
-    await chrome.storage.sync.set({ settings: updated });
+    await ext.storage.sync.set({ settings: updated });
     log(`Saved ${field} selector for ${result.rule.name}:`, value);
     return result;
   }

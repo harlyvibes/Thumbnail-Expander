@@ -12,8 +12,8 @@
   init();
 
   async function init() {
-    $("#version").textContent = "v" + chrome.runtime.getManifest().version;
-    const data = await chrome.storage.sync.get(["settings"]);
+    $("#version").textContent = "v" + ext.runtime.getManifest().version;
+    const data = await ext.storage.sync.get(["settings"]);
     render(mergeSettings(data.settings));
 
     // The popup's "Add this site" button opens this page with ?add=<hostname>.
@@ -164,7 +164,7 @@
       debug: $("#debug").checked,
       sites
     };
-    await chrome.storage.sync.set({ settings });
+    await ext.storage.sync.set({ settings });
     setStatus("ok", "Saved. Open pages update automatically.");
   });
 
@@ -173,7 +173,7 @@
   $("#reset").addEventListener("click", async () => {
     if (!confirm("Reset all settings and site rules to the defaults?")) return;
     const defaults = structuredClone(DEFAULT_SETTINGS);
-    await chrome.storage.sync.set({ settings: defaults });
+    await ext.storage.sync.set({ settings: defaults });
     render(defaults);
     setStatus("ok", "Reset to defaults.");
   });

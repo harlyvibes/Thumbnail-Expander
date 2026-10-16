@@ -1,18 +1,18 @@
 // Toolbar popup: quick switches for the extension and the current site, plus debug tools for
 // setting up a site's rule. Changes save immediately; open pages pick them up through
-// chrome.storage.onChanged.
+// ext.storage.onChanged.
 (async () => {
   const $ = (sel) => document.querySelector(sel);
 
-  const data = await chrome.storage.sync.get(["settings"]);
+  const data = await ext.storage.sync.get(["settings"]);
   const settings = mergeSettings(data.settings);
-  const save = () => chrome.storage.sync.set({ settings });
+  const save = () => ext.storage.sync.set({ settings });
 
   // The active tab, and its hostname if it's a normal web page (activeTab grants the URL here).
   let tab = null;
   let host = "";
   try {
-    [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    [tab] = await ext.tabs.query({ active: true, currentWindow: true });
     const url = new URL(tab?.url || "");
     if (url.protocol === "http:" || url.protocol === "https:") host = url.hostname;
   } catch {
@@ -56,12 +56,12 @@
 
   $("#add-site").addEventListener("click", () => {
     const domain = host.replace(/^www\./, "");
-    chrome.tabs.create({ url: chrome.runtime.getURL(`options.html?add=${encodeURIComponent(domain)}`) });
+    ext.tabs.create({ url: ext.runtime.getURL(`options.html?add=${encodeURIComponent(domain)}`) });
     window.close();
   });
 
   $("#settings").addEventListener("click", () => {
-    chrome.runtime.openOptionsPage();
+    ext.runtime.openOptionsPage();
     window.close();
   });
 
@@ -73,7 +73,7 @@
   // was installed or reloaded (the content script isn't in it yet).
   async function ask(message) {
     try {
-      return await chrome.tabs.sendMessage(tab.id, message);
+      return await ext.tabs.sendMessage(tab.id, message);
     } catch {
       showReport([{ ok: false, text: "The extension isn't running on this page yet. Reload the page and try again." }]);
       return null;
