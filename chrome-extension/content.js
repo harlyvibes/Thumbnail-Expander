@@ -9,6 +9,8 @@
   // Marks the enlarged preview; content.css sizes it to the window.
   const ENLARGED_ATTR = "data-te-enlarged";
   const WAIT_FOR_PREVIEW_MS = 5000;
+  // The close button on an enlarged preview hides after the mouse rests this long.
+  const CONTROLS_IDLE_MS = 2500;
   // Mouse movement the site would use to notice the mouse leaving its thumbnail.
   const MOVE_EVENTS = [
     "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave",
@@ -19,7 +21,8 @@
   let settings = null;
   let activeRules = [];
   const hostRules = new WeakMap(); // button host -> its site rule
-  let preview = null; // the enlarged preview: { media, host, rule, restore, ui, timer, watcher, misses }
+  // The enlarged preview: { media, host, rule, restore, ui, timer, watcher, misses, anchor, moved, idleTimer }
+  let preview = null;
   let scanQueued = false;
   let observer = null;
   let lastMouse = null; // for the debug shortcut
@@ -299,6 +302,7 @@
     // the page, so the mouse is still inside the thumbnail as far as the page can tell.
     const ui = document.createElement("div");
     ui.id = "te-preview-ui";
+    ui.className = "te-idle"; // the close button shows once the mouse moves
     ui.setAttribute("popover", "manual");
     ui.append(...createCloseControls());
     CLICKS.forEach((type) => ui.addEventListener(type, (e) => e.stopPropagation()));
@@ -309,7 +313,14 @@
     watcher.observe(media, { attributes: true, attributeFilter: [ENLARGED_ATTR, "popover"] });
 
     setWatched(null);
-    preview = { media, host, rule, restore, ui, watcher, timer: setInterval(checkEnlarged, 250), misses: 0 };
+    preview = {
+      media, host, rule, restore, ui, watcher,
+      timer: setInterval(checkEnlarged, 250),
+      misses: 0,
+      anchor: lastMouse, // where the mouse was when it opened (see revealControls)
+      moved: false,
+      idleTimer: null
+    };
     document.addEventListener("keydown", onKeyDown, true);
 
     if (!keepEnlarged()) {
@@ -317,9 +328,49 @@
       toast("Couldn't enlarge this preview.");
       return false;
     }
-    // Keyboard focus moves to the close button, off the expand button underneath.
-    ui.querySelector(".te-close").focus({ preventScroll: true });
+    hideScrollbars(restore);
+    // Take keyboard focus off the expand button underneath, so keys can't press it again.
+    if (document.activeElement?.classList.contains(BUTTON_CLASS)) document.activeElement.blur();
     return true;
+  }
+
+  // The page's scrollbar would show beside the enlarged preview (the browser draws it outside
+  // anything the page can cover), so hide it while the preview is enlarged.
+  function hideScrollbars(restore) {
+    const html = document.documentElement;
+    const body = document.body;
+    // The body's overflow normally applies to the window. Once the page's own is hidden, the
+    // body would get a scrollbar of its own instead.
+    const bodyScrolls = body && getComputedStyle(body).overflowY !== "visible";
+    // Each direction separately, so the page's own inline values are put back exactly.
+    const hide = (el) => {
+      for (const prop of ["overflow-x", "overflow-y"]) {
+        const before = el.style.getPropertyValue(prop);
+        const priority = el.style.getPropertyPriority(prop);
+        el.style.setProperty(prop, "hidden", "important");
+        restore.push(() => (before ? el.style.setProperty(prop, before, priority) : el.style.removeProperty(prop)));
+      }
+    };
+    hide(html);
+    if (bodyScrolls) hide(body);
+  }
+
+  // The close button is hidden until the mouse moves over the enlarged preview, and hides again
+  // once the mouse rests (unless it's resting on the button).
+  function revealControls() {
+    const p = preview;
+    if (!p.moved) {
+      // The browser can send a mousemove without real movement when the page changes under it.
+      if (p.anchor && Math.hypot(lastMouse.x - p.anchor.x, lastMouse.y - p.anchor.y) < 4) return;
+      p.moved = true;
+    }
+    p.ui.classList.remove("te-idle");
+    clearTimeout(p.idleTimer);
+    p.idleTimer = setTimeout(function hide() {
+      if (preview !== p) return;
+      if (p.ui.querySelector(".te-close:hover")) p.idleTimer = setTimeout(hide, CONTROLS_IDLE_MS);
+      else p.ui.classList.add("te-idle");
+    }, CONTROLS_IDLE_MS);
   }
 
   // Puts the enlarged preview in the top layer, with the close button above it. Called again
@@ -369,6 +420,7 @@
   function closePreview() {
     if (!preview) return;
     clearInterval(preview.timer);
+    clearTimeout(preview.idleTimer);
     preview.watcher.disconnect();
     preview.ui.remove();
     preview.restore.reverse().forEach((undo) => undo());
@@ -535,6 +587,7 @@
 
   function onMouseMove(e) {
     lastMouse = { x: e.clientX, y: e.clientY };
+    if (preview) revealControls();
   }
 
   // Debug mode shortcut: Alt+Shift+P (Option+Shift+P on Mac). Hover a thumbnail until its preview

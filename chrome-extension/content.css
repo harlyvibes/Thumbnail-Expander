@@ -128,7 +128,13 @@
   color: #fff;
   cursor: pointer;
   pointer-events: auto;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.25s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+/* Hidden until the mouse moves, and again once it rests (see revealControls in content.js) */
+#te-preview-ui.te-idle .te-close {
+  opacity: 0;
+  pointer-events: none;
 }
 
 #te-preview-ui .te-close svg {

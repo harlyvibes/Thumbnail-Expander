@@ -77,27 +77,102 @@ function teSelectorCandidates(el) {
   return out;
 }
 
+// Container tags that make a useful starting point for a path down to a thumbnail.
+const TE_ANCHOR_TAGS = new Set(["main", "section", "article", "ul", "ol", "li", "nav", "aside"]);
+
+// Selectors for a thumbnail. Its own (id, attributes, classes), and paths down to it from up to
+// five ancestors, like "[data-id^='SPW_'] > div > div", for thumbnails with nothing distinctive
+// of their own (only generated class names, say). Never the bare tag: "div" would put a button in
+// every box on the page.
+function teThumbnailCandidates(el) {
+  const tag = el.tagName.toLowerCase();
+  const own = teOwnCandidates(el);
+  const out = [...own];
+  // Two or more stable classes together are often specific where each alone isn't.
+  const classes = own.filter((c) => c.sel.startsWith(".")).map((c) => c.sel);
+  if (classes.length > 1) out.push({ sel: classes.slice(0, 4).join(""), rank: 2 });
+
+  // The last step of a path: the tag, narrowed to boxes holding an image, or by position.
+  const index = [...(el.parentElement?.children || [])].indexOf(el) + 1;
+  const tails = [{ sel: tag, rank: 0 }];
+  if (el.querySelector("img")) tails.push({ sel: `${tag}:has(img)`, rank: 0.1 });
+  if (index > 0) tails.push({ sel: `${tag}:nth-child(${index})`, rank: 0.3 });
+
+  let between = ""; // tags between the ancestor and el, like "div > a > "
+  for (let a = el.parentElement, depth = 0; a && a !== el.ownerDocument.body && depth < 5; a = a.parentElement, depth++) {
+    const anchors = teOwnCandidates(a).slice(0, 4);
+    if (TE_ANCHOR_TAGS.has(a.tagName.toLowerCase())) anchors.push({ sel: a.tagName.toLowerCase(), rank: 2 });
+    for (const p of anchors) {
+      const rank = 2 + depth * 0.1;
+      for (const t of tails) out.push({ sel: `${p.sel} > ${between}${t.sel}`, rank: rank + t.rank });
+      for (const o of own.slice(0, 2)) out.push({ sel: `${p.sel} ${o.sel}`, rank: rank + 0.05 });
+    }
+    between = `${a.tagName.toLowerCase()} > ${between}`;
+  }
+  return out;
+}
+
+// How well a selector picks out thumbnails like el. Thumbnails on a page share a shape, so a good
+// selector matches several boxes, nearly all shaped like el, and none inside another (each would
+// get a button). Returns { count, alike, share, nested }.
+function teThumbnailFit(el, sel) {
+  const matches = [...el.ownerDocument.querySelectorAll(sel)];
+  const r0 = el.getBoundingClientRect();
+  const ratio = r0.width / r0.height;
+  const sample = matches.slice(0, 120);
+  let alike = 0;
+  let nested = false;
+  for (const m of sample) {
+    const r = m.getBoundingClientRect();
+    if (r.width >= 40 && r.height >= 20 && Math.abs(r.width / r.height - ratio) <= ratio * 0.15) alike++;
+    if (!nested && m.parentElement?.closest(sel)) nested = true;
+  }
+  return {
+    count: matches.length,
+    alike: Math.round((alike * matches.length) / sample.length),
+    share: alike / sample.length,
+    nested
+  };
+}
+
 // Best selector for an element.
 //   kind "thumbnail": should match this element and the other thumbnails like it (many matches).
 //   kind "preview":   should match this preview video and as little else as possible. Previews
 //                     only exist while hovering, so there's usually just one on the page.
-// Returns { sel, count, rank }.
+// Returns { sel, count, rank }, or undefined.
 function teSuggestSelector(el, kind) {
-  const doc = el.ownerDocument;
+  const candidates = kind === "thumbnail" ? teThumbnailCandidates(el) : teSelectorCandidates(el);
+  const seen = new Set();
   const scored = [];
-  for (const c of teSelectorCandidates(el)) {
+  for (const c of candidates) {
+    if (seen.has(c.sel)) continue;
+    seen.add(c.sel);
     try {
       if (!el.matches(c.sel)) continue;
-      scored.push({ ...c, count: doc.querySelectorAll(c.sel).length });
+      if (kind === "thumbnail") scored.push({ ...c, ...teThumbnailFit(el, c.sel) });
+      else scored.push({ ...c, count: el.ownerDocument.querySelectorAll(c.sel).length });
     } catch {
       // Not valid CSS for this browser; skip it.
     }
   }
   if (kind === "preview") {
     scored.sort((a, b) => a.count - b.count || a.rank - b.rank);
-  } else {
-    scored.sort((a, b) => (a.count > 1 ? 0 : 1) - (b.count > 1 ? 0 : 1) || a.rank - b.rank || b.count - a.count);
+    return scored[0];
   }
+  // Thumbnails: the selector that finds the most boxes shaped like this one, if nearly all its
+  // matches are. Otherwise the one closest to that.
+  const good = scored.filter((s) => s.count > 1 && s.share >= 0.75 && !s.nested);
+  if (good.length) {
+    good.sort((a, b) => b.alike - a.alike || a.rank - b.rank || a.sel.length - b.sel.length);
+    return good[0];
+  }
+  scored.sort(
+    (a, b) =>
+      a.nested - b.nested ||
+      (a.count > 1 ? 0 : 1) - (b.count > 1 ? 0 : 1) ||
+      b.share - a.share ||
+      a.rank - b.rank
+  );
   return scored[0];
 }
 
@@ -193,19 +268,29 @@ function tePickElement({ title }) {
     let current = null;
     let under = null;
     const downStack = [];
+    const suggestions = new Map(); // element -> suggestion; working one out takes a moment
 
     const show = () => {
       if (!current) return;
       const r = current.getBoundingClientRect();
       Object.assign(box.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" });
-      const s = teSuggestSelector(teButtonHost(current), "thumbnail");
-      label.textContent = `${s ? s.sel : current.tagName.toLowerCase()}  ·  ${s ? s.count : "?"} on page  ·  ${Math.round(r.width)}×${Math.round(r.height)}`;
+      const host = teButtonHost(current);
+      if (!suggestions.has(host)) suggestions.set(host, teSuggestSelector(host, "thumbnail"));
+      const s = suggestions.get(host);
+      label.textContent = `${s ? s.sel : "no selector, try ↑"}  ·  ${s ? s.count : 0} on page  ·  ${Math.round(r.width)}×${Math.round(r.height)}`;
       label.style.left = Math.max(4, r.left) + "px";
       label.style.top = (r.top > 34 ? r.top - 30 : Math.min(innerHeight - 30, r.bottom + 6)) + "px";
     };
 
-    const elementAt = (x, y) =>
-      document.elementsFromPoint(x, y).find((e) => e !== layer && e !== document.documentElement && e !== document.body);
+    // The page element under the mouse. Sites often lay a link or a gradient over the thumbnail
+    // image; the image itself is the better starting point.
+    const elementAt = (x, y) => {
+      const stack = document
+        .elementsFromPoint(x, y)
+        .filter((e) => e !== layer && e !== document.documentElement && e !== document.body && !e.closest(".te-expand-btn"));
+      const image = stack.find((e) => e.matches("img, video, picture, canvas") && e.getBoundingClientRect().width >= 80);
+      return image || stack[0];
+    };
 
     const onMove = (e) => {
       const el = elementAt(e.clientX, e.clientY);

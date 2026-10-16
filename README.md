@@ -18,9 +18,9 @@ Comes with rules for YouTube and Dailymotion. Other sites can be added from the 
 
 1. Hover a thumbnail until the site starts its preview.
 2. Click the expand button in the thumbnail's top-left corner. The preview fills the window, exactly as the site plays it.
-3. Press **Esc** or the close button to put it back.
+3. Press **Esc** to put it back. There's also a close button in the top-right corner. It stays hidden until you move the mouse, and hides again when the mouse rests.
 
-While it's enlarged, you can move the mouse anywhere and the preview keeps playing. Clicks on the preview are blocked, so they can't open the video, and the page doesn't scroll. If you click expand before the preview starts, it waits a few seconds for it.
+While it's enlarged, you can move the mouse anywhere and the preview keeps playing. Clicks on the preview are blocked, so they can't open the video. The page doesn't scroll, and its scrollbar is hidden. If you click expand before the preview starts, it waits a few seconds for it.
 
 ## How it works
 
@@ -55,7 +55,7 @@ In the toolbar popup:
 - **Debug mode**: outlines every recognized thumbnail in purple. While you hover one, the preview it would enlarge gets a red outline. When you expand, a panel in the top-left shows the thumbnail, the preview, and how it was found, with a button to save it as the preview selector. It also logs to the browser console (filter by `Thumbnail Expander`).
 - **Alt+Shift+P** (Option+Shift+P on Mac), in debug mode: hover a thumbnail until its preview plays, then press it with the mouse over the preview. The video under the mouse is saved as the site's preview selector. It finds the video by position, so it works even when the site makes the preview ignore the mouse.
 - **Check this page**: tests the site's rule against the open page. It outlines matching thumbnails and reports how many there are and how many have buttons. It also reports the preview selector and any previews showing right now.
-- **Pick thumbnail**: point at a thumbnail and click to save its selector. **↑**/**↓** move to the parent/child element, and **Esc** cancels.
+- **Pick thumbnail**: point at a thumbnail and click to save its selector. The label shows the selector it will save and how many elements it matches; that should be the number of thumbnails. When the thumbnail has nothing distinctive of its own (only generated class names, say), the selector is a path from a parent that does, like `[datum-the-location^="SPW_"] > div > div:has(img)`. **↑**/**↓** move to the parent/child element, and **Esc** cancels.
 
 Common problems:
 
