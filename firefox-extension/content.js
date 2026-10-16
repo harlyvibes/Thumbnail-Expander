@@ -8,8 +8,6 @@
   const HOST_ATTR = "data-te-host";
   // Marks the enlarged preview; content.css sizes it to the window.
   const ENLARGED_ATTR = "data-te-enlarged";
-  // While set on a preview, the site can't change its volume or mute (see sound-lock.js).
-  const SOUND_LOCK_ATTR = "data-te-sound-lock";
   const WAIT_FOR_PREVIEW_MS = 5000;
   // The close button on an enlarged preview hides after the mouse rests this long.
   const CONTROLS_IDLE_MS = 2500;
@@ -23,7 +21,7 @@
   let settings = null;
   let activeRules = [];
   const hostRules = new WeakMap(); // button host -> its site rule
-  // The enlarged preview: { media, host, rule, restore, ui, watcher, volume, timer, misses, anchor, moved, idleTimer }
+  // The enlarged preview: { media, host, rule, restore, ui, timer, watcher, misses, anchor, moved, idleTimer }
   let preview = null;
   let scanQueued = false;
   let observer = null;
@@ -121,12 +119,6 @@
   // Rounded-stroke line icons (24x24). The expand corners match the extension icon.
   const EXPAND_ICON = "M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3";
   const CLOSE_ICON = "M6 6l12 12M18 6L6 18";
-  const SPEAKER = "M11 5L6 9H3v6h3l5 4z";
-  const VOLUME_ICONS = {
-    muted: SPEAKER + "M16 9l6 6M22 9l-6 6",
-    low: SPEAKER + "M15.5 8.5a5 5 0 0 1 0 7",
-    high: SPEAKER + "M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"
-  };
 
   // Built with DOM calls rather than innerHTML, which some sites (e.g. YouTube) forbid.
   function createIcon(d) {
@@ -305,16 +297,13 @@
       window.removeEventListener("wheel", noScroll, { capture: true });
     });
 
-    // Close button, hint and volume control, in the top layer above the preview. They sit next to
-    // the preview in the page, so the mouse is still inside the thumbnail as far as the page can
-    // tell.
+    // Close button and hint, in the top layer above the preview. They sit next to the preview in
+    // the page, so the mouse is still inside the thumbnail as far as the page can tell.
     const ui = document.createElement("div");
     ui.id = "te-preview-ui";
-    ui.className = "te-idle"; // the controls show once the mouse moves
+    ui.className = "te-idle"; // the close button shows once the mouse moves
     ui.setAttribute("popover", "manual");
     ui.append(...createCloseControls());
-    const volume = createVolumeControl(media, restore);
-    if (volume) ui.append(volume.element);
     CLICKS.forEach((type) => ui.addEventListener(type, (e) => e.stopPropagation()));
     media.parentElement.appendChild(ui);
 
@@ -324,7 +313,7 @@
 
     setWatched(null);
     preview = {
-      media, host, rule, restore, ui, watcher, volume,
+      media, host, rule, restore, ui, watcher,
       timer: setInterval(checkEnlarged, 250),
       misses: 0,
       anchor: lastMouse, // where the mouse was when it opened (see revealControls)
@@ -367,9 +356,9 @@
     if (bodyScrolls) hide(body);
   }
 
-  // Like a video player, the controls (close button, volume) and the mouse cursor show while the
-  // mouse moves over the enlarged preview and hide once it rests (unless it's resting on a
-  // control). The controls start out hidden; the cursor hides after the first rest.
+  // Like a video player, the close button and the mouse cursor show while the mouse moves over
+  // the enlarged preview and hide once it rests (unless it's resting on the button). The close
+  // button starts out hidden; the cursor hides after the first rest.
   function revealControls() {
     const p = preview;
     if (!p.moved) {
@@ -385,12 +374,12 @@
     clearTimeout(p.idleTimer);
     p.idleTimer = setTimeout(function hide() {
       if (preview !== p) return;
-      if (p.ui.querySelector(".te-close:hover, .te-volume:hover")) p.idleTimer = setTimeout(hide, CONTROLS_IDLE_MS);
+      if (p.ui.querySelector(".te-close:hover")) p.idleTimer = setTimeout(hide, CONTROLS_IDLE_MS);
       else setIdle(p, true);
     }, CONTROLS_IDLE_MS);
   }
 
-  // content.css hides the controls (te-idle) and the cursor over the preview ("idle").
+  // content.css hides the close button (te-idle) and the cursor over the preview ("idle").
   function setIdle(p, idle) {
     p.ui.classList.toggle("te-idle", idle);
     p.media.setAttribute(ENLARGED_ATTR, idle ? "idle" : "");
@@ -429,10 +418,8 @@
     const next = !media.isConnected && findPreview(host, rule);
     if (next) {
       log("The site replaced the preview element. Enlarging the new one:", next.media);
-      // The sound picked with the volume control carries over.
-      const level = preview.volume?.wanted();
       closePreview();
-      if (enlargePreview(next.media, host, rule) && level != null) preview.volume?.setLevel(level, false);
+      enlargePreview(next.media, host, rule);
       return;
     }
     // Removed, or hidden by the site. Give it a second to come back.
@@ -481,109 +468,6 @@
     key.textContent = "Esc";
     hint.append("Press ", key, " to close");
     return [closeBtn, hint];
-  }
-
-  // Mute button and volume slider for the enlarged preview (bottom left). The mouse wheel over it
-  // changes the volume too. If you change the sound, it's put back as the site had it on close.
-  // Returns { element, wanted(), setLevel(level, reveal) }, or null for a player iframe, whose
-  // sound the page can't reach.
-  function createVolumeControl(media, restore) {
-    if (!media.matches("video, audio")) return null;
-    const before = { muted: media.muted, volume: media.volume };
-    let lastLevel = media.volume || 1; // what unmuting goes back to
-    let wanted = null; // the level picked with the control, once it's been used
-    let changed = false;
-    let dragging = false;
-    let undone = []; // when the site undid the picked level (see onVolumeChange)
-
-    const wrap = document.createElement("div");
-    wrap.className = "te-volume";
-    const button = document.createElement("button");
-    button.type = "button";
-    const icon = createIcon(VOLUME_ICONS.high);
-    button.appendChild(icon);
-    const slider = document.createElement("input");
-    slider.type = "range";
-    slider.min = "0";
-    slider.max = "1";
-    slider.step = "0.01";
-    slider.setAttribute("aria-label", "Volume");
-    wrap.append(button, slider);
-
-    const level = () => (media.muted ? 0 : media.volume);
-    // Only what differs, so each change makes as few volumechange events as possible.
-    const apply = (v) => {
-      if (v > 0 && media.volume !== v) media.volume = v;
-      if (media.muted !== (v === 0)) media.muted = v === 0;
-    };
-    const show = (v) => {
-      if (v > 0) lastLevel = v;
-      // Mid-drag the slider is where the mouse puts it.
-      if (!dragging) slider.value = String(v);
-      slider.style.setProperty("--te-level", `${Math.round(v * 100)}%`);
-      icon.firstChild.setAttribute("d", v === 0 ? VOLUME_ICONS.muted : v < 0.5 ? VOLUME_ICONS.low : VOLUME_ICONS.high);
-      button.setAttribute("aria-label", v === 0 ? "Unmute" : "Mute");
-    };
-    const setLevel = (v, reveal = true) => {
-      changed = true;
-      wanted = Math.min(1, Math.max(0, v));
-      // From now on the site can't change the sound (it would drag the slider back).
-      media.setAttribute(SOUND_LOCK_ATTR, "");
-      apply(wanted);
-      show(wanted);
-      // Using the control counts as moving the mouse: keep the controls up.
-      if (reveal && preview) {
-        setIdle(preview, false);
-        restartIdleTimer(preview);
-      }
-    };
-
-    // Some sites reset a preview's sound (keeping previews muted, or at their own volume), which
-    // would drag the slider back. Once the control has been used, its level wins: sound-lock.js
-    // stops the site's changes, and the site no longer hears that the sound changed. Should a
-    // change get through anyway, the level is put back; if that keeps happening, give up rather
-    // than fight forever.
-    const onVolumeChange = (e) => {
-      if (e.target !== media) return;
-      if (wanted !== null) {
-        e.stopImmediatePropagation();
-        if (Math.abs(level() - wanted) > 0.001) {
-          const now = Date.now();
-          undone = undone.filter((t) => now - t < 2000);
-          if (undone.length < 40) {
-            undone.push(now);
-            log(`The site changed the preview's sound (${media.muted ? "muted" : media.volume.toFixed(2)}); putting back ${wanted.toFixed(2)}.`);
-            apply(wanted);
-            return;
-          }
-          log("The site keeps changing the preview's sound; leaving it to the site.");
-          wanted = null;
-          media.removeAttribute(SOUND_LOCK_ATTR);
-        }
-      }
-      show(level());
-    };
-
-    button.addEventListener("click", () => setLevel(level() === 0 ? lastLevel : 0));
-    slider.addEventListener("pointerdown", () => (dragging = true));
-    const dragEnd = () => {
-      dragging = false;
-      show(level());
-    };
-    ["pointerup", "pointercancel", "change"].forEach((type) => slider.addEventListener(type, dragEnd));
-    slider.addEventListener("input", () => setLevel(Number(slider.value)));
-    wrap.addEventListener("wheel", (e) => setLevel(level() + (e.deltaY < 0 ? 0.05 : -0.05)));
-    // On the window, capturing, so it runs before the site's own listeners on the preview.
-    window.addEventListener("volumechange", onVolumeChange, true);
-    restore.push(() => {
-      window.removeEventListener("volumechange", onVolumeChange, true);
-      media.removeAttribute(SOUND_LOCK_ATTR);
-      if (!changed) return;
-      media.volume = before.volume;
-      media.muted = before.muted;
-    });
-    show(level());
-    return { element: wrap, wanted: () => wanted, setLevel };
   }
 
   function onKeyDown(e) {
