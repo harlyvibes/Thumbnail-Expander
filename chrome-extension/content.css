@@ -1,38 +1,37 @@
 /* Styles injected into video sites. Everything is scoped to te- classes/ids, and buttons start
    from `all: initial` so the site's own button styles can't leak into them. */
 
-/* ---------- Expand button (in a corner of a thumbnail) ---------- */
+/* ---------- Expand button (top-left corner of a thumbnail) ---------- */
 
-/* Small and plain, so it covers as little of the thumbnail as possible. The corner is set per
-   site (te-pos-*). */
 .te-expand-btn {
   all: initial;
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 8px;
+  left: 8px;
   z-index: 2147483000;
   box-sizing: border-box;
-  width: 26px;
-  height: 26px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.6);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(18, 18, 24, 0.55);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   color: #fff;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease;
+  transform: scale(0.9);
+  transition: opacity 0.16s ease, transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
-
-.te-expand-btn.te-pos-top-right { left: auto; right: 6px; }
-.te-expand-btn.te-pos-bottom-left { top: auto; bottom: 6px; }
-.te-expand-btn.te-pos-bottom-right { top: auto; bottom: 6px; left: auto; right: 6px; }
 
 .te-expand-btn svg {
   display: block;
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   pointer-events: none;
 }
 
@@ -40,15 +39,22 @@
 *:hover > .te-expand-btn,
 .te-expand-btn:focus-visible {
   opacity: 1;
+  transform: scale(1);
 }
 
 .te-expand-btn:hover {
-  background: rgba(0, 0, 0, 0.85);
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.08);
+}
+
+.te-expand-btn:active {
+  transform: scale(0.96);
 }
 
 .te-expand-btn:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 1px;
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
 }
 
 /* ---------- Enlarged preview ---------- */
@@ -122,13 +128,7 @@
   color: #fff;
   cursor: pointer;
   pointer-events: auto;
-  transition: opacity 0.25s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-/* Hidden until the mouse moves, and again once it rests (see revealControls in content.js) */
-#te-preview-ui.te-idle .te-close {
-  opacity: 0;
-  pointer-events: none;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 #te-preview-ui .te-close svg {
@@ -199,6 +199,7 @@ html.te-debug [data-te-attached] {
 
 html.te-debug .te-expand-btn {
   opacity: 1;
+  transform: scale(1);
 }
 
 /* Thumbnails (purple) and previews (red) found by the debug tools */

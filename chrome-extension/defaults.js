@@ -8,19 +8,8 @@
 //   thumbnail - CSS selector for the thumbnail element; the expand button is added inside it
 //   preview   - optional CSS selector for the preview video. Empty: use whichever video (or player
 //               iframe) is playing over the thumbnail when you click expand.
-//   button    - which corner of the thumbnail the expand button goes in, or "hidden" (expand with
-//               the Alt+Shift+E shortcut instead)
 
 const SETTINGS_VERSION = 4;
-
-const BUTTON_POSITIONS = {
-  "top-left": "Top left",
-  "top-right": "Top right",
-  "bottom-left": "Bottom left",
-  "bottom-right": "Bottom right",
-  hidden: "Hidden"
-};
-const DEFAULT_BUTTON = "top-left";
 
 // Dailymotion wraps each thumbnail in a fixed-ratio box whose direct child is the video link.
 // The class names carry a build hash, so match on the stable prefix.
@@ -40,17 +29,14 @@ const DEFAULT_SETTINGS = {
       // ytd-video-preview is the floating hover preview YouTube places over some thumbnails
       // (search results, sidebar). It covers the thumbnail, so it gets its own button.
       thumbnail: "ytd-thumbnail, yt-thumbnail-view-model, ytd-video-preview",
-      preview: "",
-      // YouTube's mute and captions buttons are in the top-right corner.
-      button: "top-left"
+      preview: ""
     },
     {
       name: "Dailymotion",
       enabled: true,
       hosts: "dailymotion.com",
       thumbnail: DAILYMOTION_THUMBNAIL_SELECTOR,
-      preview: "",
-      button: DEFAULT_BUTTON
+      preview: ""
     }
   ]
 };
@@ -83,8 +69,7 @@ function mergeSettings(saved) {
       enabled: site.enabled !== false,
       hosts: site.hosts || "",
       thumbnail,
-      preview: site.preview || "",
-      button: Object.hasOwn(BUTTON_POSITIONS, site.button ?? "") ? site.button : DEFAULT_BUTTON
+      preview: site.preview || ""
     };
   });
 
@@ -110,8 +95,7 @@ function newSiteRule(hostname = "") {
     enabled: true,
     hosts: domain,
     thumbnail: "",
-    preview: "",
-    button: DEFAULT_BUTTON
+    preview: ""
   };
 }
 
