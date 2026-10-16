@@ -20,11 +20,13 @@ Comes with rules for YouTube and Dailymotion. Other sites can be added from the 
 2. Click the expand button in the thumbnail's top-left corner. The preview fills the window, exactly as the site plays it.
 3. Press **Esc** or the close button to put it back.
 
-While it's enlarged, clicks on the preview are blocked, so they can't open the video. If you click expand before the preview starts, it waits a few seconds for it.
+While it's enlarged, you can move the mouse anywhere and the preview keeps playing. Clicks on the preview are blocked, so they can't open the video, and the page doesn't scroll. If you click expand before the preview starts, it waits a few seconds for it.
 
 ## How it works
 
-The extension doesn't copy or reload the preview. It restyles the site's own preview element to cover the window, and undoes anything that would keep it boxed in, such as transforms on the thumbnail card. The preview stays inside the thumbnail in the page, so the site still sees the mouse over the thumbnail and keeps playing it. Links around it are disabled until you close it. Closing puts every change back.
+The extension doesn't copy or reload the preview. It lifts the site's own preview element into the browser's top layer (as a popover), where it's drawn above everything on the page and nothing can clip, shrink or cover it. The extension's stylesheet sizes it to the window and wins over the site's own styles, even ones the site's scripts keep rewriting. The preview stays inside the thumbnail in the page, so the site still treats it as that thumbnail's preview.
+
+While it's enlarged, the site doesn't see mouse movement, so it can't tell the mouse left the thumbnail, and it doesn't see the page scroll. Links around the preview are disabled. If the site swaps in a new preview element, the extension enlarges that one instead. Closing puts every change back.
 
 ## Settings
 

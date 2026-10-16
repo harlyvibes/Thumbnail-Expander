@@ -6,12 +6,20 @@
   const ATTACHED_ATTR = "data-te-attached";
   // Marks the element holding a button, so the debug tools can find the hovered thumbnail.
   const HOST_ATTR = "data-te-host";
+  // Marks the enlarged preview; content.css sizes it to the window.
+  const ENLARGED_ATTR = "data-te-enlarged";
   const WAIT_FOR_PREVIEW_MS = 5000;
+  // Mouse movement the site would use to notice the mouse leaving its thumbnail.
+  const MOVE_EVENTS = [
+    "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave",
+    "pointermove", "pointerover", "pointerout", "pointerenter", "pointerleave", "pointerrawupdate"
+  ];
+  const SCROLL_KEYS = new Set([" ", "PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 
   let settings = null;
   let activeRules = [];
   const hostRules = new WeakMap(); // button host -> its site rule
-  let preview = null; // the enlarged preview: { media, restore, ui, timer }
+  let preview = null; // the enlarged preview: { media, host, rule, restore, ui, timer, watcher, misses }
   let scanQueued = false;
   let observer = null;
   let lastMouse = null; // for the debug shortcut
@@ -30,7 +38,9 @@
     applySettings();
 
     window.addEventListener("keydown", onDebugShortcut, true);
-    document.addEventListener("mousemove", onMouseMove, { capture: true, passive: true });
+    // On window, and added before the enlarged preview hides mouse movement from the site, so it
+    // still sees the mouse.
+    window.addEventListener("mousemove", onMouseMove, { capture: true, passive: true });
 
     // Requests from the toolbar popup's debug tools.
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -197,8 +207,7 @@
       media: teDescribe(found.media),
       suggestion: teSuggestSelector(found.media, "preview")
     };
-    enlargePreview(found.media);
-    if (details) showPreviewDebug(rule, found, details);
+    if (enlargePreview(found.media, host, rule) && details) showPreviewDebug(rule, found, details);
   }
 
   // The preview for a thumbnail, as { media, how }, or null.
@@ -241,74 +250,28 @@
     return null;
   }
 
-  // Enlarges the preview element itself to fill the window. It stays where it is in the page
-  // (only its styles change), so the site still sees the mouse over its thumbnail and keeps the
-  // preview playing. Everything is put back on close.
-  function enlargePreview(media) {
+  // Enlarges the preview element itself to fill the window. It's lifted into the browser's top
+  // layer (as a popover), which draws it above everything on the page, outside any box that could
+  // clip, shrink or cover it. It stays where it is in the page, so the site still treats it as the
+  // thumbnail's preview and keeps it playing. Everything is put back on close.
+  // Returns true if the preview was enlarged.
+  function enlargePreview(media, host, rule) {
     const restore = [];
-    // The whole style attribute is saved and put back on close.
-    const setStyles = (el, props) => {
-      const before = el.getAttribute("style");
-      restore.push(() => (before === null ? el.removeAttribute("style") : el.setAttribute("style", before)));
-      for (const [prop, value] of Object.entries(props)) el.style.setProperty(prop, value, "important");
-    };
 
-    for (let a = media.parentElement; a && a !== document.documentElement; a = a.parentElement) {
-      const cs = getComputedStyle(a);
-      const props = {};
-      // Anything that would make a fixed element size itself to this box instead of the window,
-      // or clip it.
-      if (cs.transform !== "none") props.transform = "none";
-      if (cs.translate !== "none") props.translate = "none";
-      if (cs.scale !== "none") props.scale = "none";
-      if (cs.rotate !== "none") props.rotate = "none";
-      if (cs.filter !== "none") props.filter = "none";
-      if (cs.backdropFilter && cs.backdropFilter !== "none") props["backdrop-filter"] = "none";
-      if (cs.perspective !== "none") props.perspective = "none";
-      if (cs.contain !== "none") props.contain = "none";
-      if (cs.containerType && cs.containerType !== "normal") props["container-type"] = "normal";
-      if (cs.willChange !== "auto") props["will-change"] = "auto";
-      if (cs.clipPath !== "none") props["clip-path"] = "none";
-      if (cs.maskImage && cs.maskImage !== "none") props["mask-image"] = "none";
-      if (cs.contentVisibility && cs.contentVisibility !== "visible") props["content-visibility"] = "visible";
-      // Lift every stacking layer on the way up, so the site's header can't cover the preview.
-      if (cs.zIndex !== "auto" || cs.position === "fixed" || cs.position === "sticky") props["z-index"] = "2147483646";
-      if (cs.opacity !== "1") props.opacity = "1";
-      if (cs.isolation === "isolate") props.isolation = "auto";
-      if (Object.keys(props).length) {
-        // Apply instantly: an animated transform would hold the preview inside the card meanwhile.
-        props.transition = "none";
-        setStyles(a, props);
-      }
-
-      // A link around the preview would open the video's page when the preview is clicked.
-      if (a.matches("a[href]")) {
-        const href = a.getAttribute("href");
-        a.removeAttribute("href");
-        restore.push(() => a.setAttribute("href", href));
-      }
+    // A link around the preview would open the video's page when the preview is clicked.
+    for (let a = media.parentElement; a; a = a.parentElement) {
+      if (!a.matches("a[href]")) continue;
+      const href = a.getAttribute("href");
+      a.removeAttribute("href");
+      restore.push(() => a.setAttribute("href", href));
     }
 
-    setStyles(media, {
-      position: "fixed",
-      inset: "0",
-      width: "100vw",
-      height: "100vh",
-      "max-width": "none",
-      "max-height": "none",
-      "min-width": "0",
-      "min-height": "0",
-      margin: "0",
-      display: "block",
-      "z-index": "2147483646",
-      "object-fit": "contain",
-      background: "#000",
-      transform: "none",
-      "border-radius": "0",
-      opacity: "1",
-      visibility: "visible",
-      // The mouse must be over the preview to keep the site's hover (and the preview) alive.
-      "pointer-events": "auto"
+    const popoverBefore = media.getAttribute("popover");
+    restore.push(() => {
+      if (media.matches(":popover-open")) media.hidePopover();
+      if (popoverBefore === null) media.removeAttribute("popover");
+      else media.setAttribute("popover", popoverBefore);
+      media.removeAttribute(ENLARGED_ATTR);
     });
 
     // The preview plays exactly as the site plays it; only its size changes. Clicks on it are
@@ -317,42 +280,108 @@
       e.preventDefault();
       e.stopPropagation();
     };
-    const noScroll = (e) => e.preventDefault();
     const CLICKS = ["click", "dblclick", "auxclick", "mousedown", "mouseup", "pointerdown", "pointerup"];
     CLICKS.forEach((type) => media.addEventListener(type, swallow));
-    media.addEventListener("wheel", noScroll, { passive: false });
+    restore.push(() => CLICKS.forEach((type) => media.removeEventListener(type, swallow)));
+
+    // Hide mouse movement from the site. The mouse is now over the big preview, often far outside
+    // the thumbnail, and sites stop a preview once they see the mouse leave its thumbnail. As far
+    // as the site knows, the mouse stays where it clicked. The page can't scroll either: sites
+    // also stop previews that scroll out of view.
+    MOVE_EVENTS.forEach((type) => window.addEventListener(type, hideFromSite, true));
+    window.addEventListener("wheel", noScroll, { capture: true, passive: false });
     restore.push(() => {
-      CLICKS.forEach((type) => media.removeEventListener(type, swallow));
-      media.removeEventListener("wheel", noScroll);
+      MOVE_EVENTS.forEach((type) => window.removeEventListener(type, hideFromSite, true));
+      window.removeEventListener("wheel", noScroll, { capture: true });
     });
 
-    // Close button and hint, placed next to the preview so the mouse never leaves the thumbnail.
+    // Close button and hint, in the top layer above the preview. They sit next to the preview in
+    // the page, so the mouse is still inside the thumbnail as far as the page can tell.
     const ui = document.createElement("div");
     ui.id = "te-preview-ui";
+    ui.setAttribute("popover", "manual");
     ui.append(...createCloseControls());
     CLICKS.forEach((type) => ui.addEventListener(type, (e) => e.stopPropagation()));
     media.parentElement.appendChild(ui);
 
-    // If the site removes the preview (it ended, say), put everything back.
-    const timer = setInterval(() => {
-      if (!media.isConnected) {
-        closePreview();
-        toast("The site stopped the preview.");
-      }
-    }, 500);
+    // Puts the preview back on top as soon as the site touches the attributes that keep it there.
+    const watcher = new MutationObserver(() => preview && keepEnlarged());
+    watcher.observe(media, { attributes: true, attributeFilter: [ENLARGED_ATTR, "popover"] });
 
     setWatched(null);
-    preview = { media, restore, ui, timer };
+    preview = { media, host, rule, restore, ui, watcher, timer: setInterval(checkEnlarged, 250), misses: 0 };
     document.addEventListener("keydown", onKeyDown, true);
+
+    if (!keepEnlarged()) {
+      closePreview();
+      toast("Couldn't enlarge this preview.");
+      return false;
+    }
+    // Keyboard focus moves to the close button, off the expand button underneath.
+    ui.querySelector(".te-close").focus({ preventScroll: true });
+    return true;
+  }
+
+  // Puts the enlarged preview in the top layer, with the close button above it. Called again
+  // whenever the site disturbs it. Returns false if that isn't possible.
+  function keepEnlarged() {
+    const { media, ui } = preview;
+    try {
+      if (!media.hasAttribute(ENLARGED_ATTR)) media.setAttribute(ENLARGED_ATTR, "");
+      if (media.getAttribute("popover") !== "manual") media.setAttribute("popover", "manual");
+      if (!ui.isConnected) (media.parentElement || document.documentElement).appendChild(ui);
+      if (!media.matches(":popover-open")) {
+        media.showPopover();
+        // The preview is now above the close button; put the button back on top.
+        if (ui.matches(":popover-open")) ui.hidePopover();
+      }
+      if (!ui.matches(":popover-open")) ui.showPopover();
+      return true;
+    } catch (err) {
+      log("Couldn't put the preview on top:", err);
+      return false;
+    }
+  }
+
+  // Runs every 250 ms while a preview is enlarged. Keeps it on top, follows the site if it swaps
+  // in a new preview element, and closes once the site has stopped the preview.
+  function checkEnlarged() {
+    const { media, host, rule } = preview;
+    if (media.isConnected && media.getClientRects().length) {
+      preview.misses = 0;
+      keepEnlarged();
+      return;
+    }
+    const next = !media.isConnected && findPreview(host, rule);
+    if (next) {
+      log("The site replaced the preview element. Enlarging the new one:", next.media);
+      closePreview();
+      enlargePreview(next.media, host, rule);
+      return;
+    }
+    // Removed, or hidden by the site. Give it a second to come back.
+    if (++preview.misses >= 4) {
+      closePreview();
+      toast("The site stopped the preview.");
+    }
   }
 
   function closePreview() {
     if (!preview) return;
     clearInterval(preview.timer);
+    preview.watcher.disconnect();
     preview.ui.remove();
     preview.restore.reverse().forEach((undo) => undo());
     preview = null;
     document.removeEventListener("keydown", onKeyDown, true);
+  }
+
+  function hideFromSite(e) {
+    e.stopImmediatePropagation();
+  }
+
+  function noScroll(e) {
+    e.preventDefault();
   }
 
   // Close button plus a brief "Press Esc to close" hint that fades out on its own.
@@ -378,21 +407,26 @@
   }
 
   function onKeyDown(e) {
-    if (e.key !== "Escape") return;
-    // Let Esc leave browser fullscreen first; a second Esc closes the preview.
-    if (document.fullscreenElement) return;
-    e.preventDefault();
-    e.stopPropagation();
-    closePreview();
+    if (e.key === "Escape") {
+      // Let Esc leave browser fullscreen first; a second Esc closes the preview.
+      if (document.fullscreenElement) return;
+      e.preventDefault();
+      e.stopPropagation();
+      closePreview();
+    } else if (SCROLL_KEYS.has(e.key) && !e.target.closest?.("input, textarea, select, [contenteditable]")) {
+      // Keep the page still underneath (see enlargePreview).
+      e.preventDefault();
+    }
   }
 
-  // Message along the bottom of the page that fades out.
+  // Message along the bottom of the page that fades out. While a preview is enlarged it goes in
+  // the preview's top-layer controls, or the preview would cover it.
   function toast(text) {
     document.querySelector(".te-toast")?.remove();
     const el = document.createElement("div");
     el.className = "te-toast";
     el.textContent = text;
-    document.documentElement.appendChild(el);
+    (preview?.ui || document.documentElement).appendChild(el);
     setTimeout(() => el.remove(), 7000);
   }
 
@@ -514,7 +548,8 @@
   }
 
   async function grabPreviewUnderMouse() {
-    const media = lastMouse && teVideoAt(lastMouse);
+    // While a preview is enlarged, that's the one under the mouse.
+    const media = preview?.media || (lastMouse && teVideoAt(lastMouse));
     log("Alt+Shift+P at", lastMouse, "found", media);
     if (!media) {
       toast("No video under the mouse. Hover a thumbnail until its preview plays, then press Alt+Shift+P.");

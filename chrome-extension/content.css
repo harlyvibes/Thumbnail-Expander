@@ -59,9 +59,46 @@
 
 /* ---------- Enlarged preview ---------- */
 
-/* The preview itself is restyled inline (see enlargePreview in content.js). This layer holds its
-   close button and hint. It sits next to the preview (inside the thumbnail), above it, and lets
-   the mouse through so the site keeps seeing the mouse over its thumbnail. */
+/* The enlarged preview. content.js lifts it into the browser's top layer (as a popover), so
+   nothing on the page can cover, clip or shrink it, and these rules size it to the window. They
+   win over the site's own styles, including ones its scripts keep writing on the element. The
+   :not(#te-x) parts only raise the rule's priority. */
+[data-te-enlarged]:not(#te-x):not(#te-x):not(#te-x) {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  overflow: hidden !important;
+  object-fit: contain !important;
+  object-position: 50% 50% !important;
+  background: #000 !important;
+  transform: none !important;
+  translate: none !important;
+  scale: none !important;
+  rotate: none !important;
+  filter: none !important;
+  clip-path: none !important;
+  mask: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  /* The mouse must be over the preview (part of the thumbnail) to keep the site's hover alive */
+  pointer-events: auto !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+/* The close button and hint, in the top layer above the preview. The layer sits next to the
+   preview (inside the thumbnail) and lets the mouse through to it. */
 #te-preview-ui {
   all: initial;
   position: fixed;
