@@ -27,12 +27,21 @@
   document.body.classList.toggle("off", !settings.enabled);
   document.body.classList.toggle("nopage", !host);
 
+  const MODE_HINTS = {
+    preview: "Hover a thumbnail until its preview plays, then click expand.",
+    page: "Opens the video's page in the expanded view.",
+    embed: "Uses the site's embeddable player."
+  };
+
   const site = $("#site");
   if (rule) {
     site.dataset.state = "rule";
     $("#rule-name").textContent = rule.name || host;
     $("#rule-host").textContent = host;
     $("#site-enabled").checked = rule.enabled !== false;
+    const mode = rule.mode || "embed";
+    $(`#mode-${mode}`).checked = true;
+    $("#mode-hint").textContent = MODE_HINTS[mode];
   } else if (host) {
     site.dataset.state = "norule";
     $("#host").textContent = host.replace(/^www\./, "");
@@ -56,6 +65,12 @@
 
   $("#site-enabled").addEventListener("change", (e) => {
     rule.enabled = e.target.checked;
+    save();
+  });
+
+  $("#mode").addEventListener("change", (e) => {
+    rule.mode = e.target.value;
+    $("#mode-hint").textContent = MODE_HINTS[rule.mode];
     save();
   });
 
@@ -126,6 +141,9 @@
       lines.push({ ok: false, text: "No rule for this site yet. Use Pick thumbnail to start one." });
     } else {
       lines.push({ ok: r.rule.enabled, text: `Rule: ${r.rule.name}, ${r.rule.mode} mode${r.rule.enabled ? "" : " (turned off)"}` });
+      if (r.rule.mode === "preview") {
+        lines.push({ ok: null, text: "Preview mode: hover a thumbnail until its preview plays, then click expand." });
+      }
       const t = r.thumbnails;
       if (!t.selector) lines.push({ ok: false, text: "No thumbnail selector yet. Use Pick thumbnail." });
       else if (!t.valid) lines.push({ ok: false, text: "Thumbnail selector isn't valid CSS:", code: t.selector });
@@ -141,7 +159,7 @@
         if (r.rule.mode === "page" && t.offSite) {
           lines.push({ ok: false, text: `${t.offSite} link(s) go to another site (often ads); page mode can't open those.` });
         }
-        if (r.rule.mode !== "page" && t.sample) {
+        if (r.rule.mode === "embed" && t.sample) {
           lines.push(t.embedUrl ? { ok: true, text: "Embed URL:", code: t.embedUrl } : { ok: false, text: "The video ID pattern doesn't match the link." });
         }
       }

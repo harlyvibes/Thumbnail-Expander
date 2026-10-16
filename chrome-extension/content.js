@@ -151,6 +151,11 @@
       // Stop the thumbnail's link from navigating to the watch page.
       e.preventDefault();
       e.stopPropagation();
+      if (rule.mode === "preview") {
+        log(`Expand clicked (${rule.name}, preview mode). Thumbnail:`, host);
+        expandPreview(host);
+        return;
+      }
       const url = getVideoUrl(thumb, rule);
       log(`Expand clicked (${rule.name}, ${rule.mode} mode). Video link:`, url || "(none found)", "Thumbnail:", thumb);
       openOverlay(url, rule);
@@ -196,23 +201,7 @@
 
     overlay = document.createElement("div");
     overlay.id = "te-overlay";
-
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.className = "te-close";
-    closeBtn.title = "Close (Esc)";
-    closeBtn.setAttribute("aria-label", "Close");
-    closeBtn.appendChild(createIcon(CLOSE_ICON));
-    closeBtn.addEventListener("click", closeOverlay);
-    overlay.appendChild(closeBtn);
-
-    // Brief "Press Esc to close" hint that fades out on its own.
-    const hint = document.createElement("div");
-    hint.className = "te-hint";
-    const key = document.createElement("kbd");
-    key.textContent = "Esc";
-    hint.append("Press ", key, " to close");
-    overlay.appendChild(hint);
+    overlay.append(...createCloseControls());
 
     const error = rule.mode === "page" ? addPageFrame(videoUrl, rule) : addEmbedFrame(videoUrl, rule);
     if (error) showMessage(error);
@@ -223,6 +212,28 @@
     document.documentElement.appendChild(overlay);
     document.documentElement.classList.add("te-locked");
     document.addEventListener("keydown", onKeyDown, true);
+  }
+
+  // Close button plus a brief "Press Esc to close" hint that fades out on its own.
+  function createCloseControls() {
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "te-close";
+    closeBtn.title = "Close (Esc)";
+    closeBtn.setAttribute("aria-label", "Close");
+    closeBtn.appendChild(createIcon(CLOSE_ICON));
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeOverlay();
+    });
+
+    const hint = document.createElement("div");
+    hint.className = "te-hint";
+    const key = document.createElement("kbd");
+    key.textContent = "Esc";
+    hint.append("Press ", key, " to close");
+    return [closeBtn, hint];
   }
 
   function showMessage(text) {
@@ -519,7 +530,7 @@
         }
       }).length;
       t.sample = urls.find((u) => u.startsWith(location.origin)) || urls[0] || null;
-      if (t.sample && rule.mode !== "page") t.embedUrl = buildEmbedUrl(t.sample, rule);
+      if (t.sample && rule.mode === "embed") t.embedUrl = buildEmbedUrl(t.sample, rule);
       result.thumbnails = t;
       teHighlight(thumbs, "thumb");
     }
@@ -600,7 +611,7 @@
   }
 
   async function grabPlayerUnderMouse() {
-    if (overlay) {
+    if (overlay || preview) {
       toast("Close the expanded video first, then use Alt+Shift+P on the video's own page.");
       return;
     }
@@ -621,7 +632,167 @@
     framePoll = null;
   }
 
+  // ---------- Preview mode ----------
+  // Enlarges the video the site is already playing in the thumbnail (its hover preview) to fill
+  // the window. Nothing new is loaded: it's the same preview, on the same page, with no click
+  // through to the video's page. The video stays where it is in the page (only its styles
+  // change), so the site still sees the mouse over its thumbnail and keeps the preview playing.
+
+  let preview = null; // { restore: [functions], ui, timer }
+
+  async function expandPreview(host) {
+    closeOverlay();
+    let media = findPreviewMedia(host);
+    if (!media) {
+      // Clicked before the preview started: give it a few seconds.
+      toast("Waiting for the preview to start…");
+      const started = Date.now();
+      while (!media && Date.now() - started < 5000) {
+        await new Promise((r) => setTimeout(r, 150));
+        media = findPreviewMedia(host);
+      }
+      document.querySelector(".te-toast")?.remove();
+    }
+    if (!media) {
+      log("Preview mode: no video playing over", host);
+      toast("No preview is playing in this thumbnail. Hover it until the video starts, then click expand.");
+      return;
+    }
+    log("Preview mode: enlarging", media);
+    enlargePreview(media);
+  }
+
+  // The video (or player iframe) playing in or over the thumbnail: whichever covers most of it.
+  function findPreviewMedia(host) {
+    const t = host.getBoundingClientRect();
+    const thumbArea = t.width * t.height;
+    if (!thumbArea) return null;
+    let best = null;
+    let bestCover = 0;
+    for (const m of document.querySelectorAll("video, iframe")) {
+      if (m.closest("#te-overlay")) continue;
+      const r = m.getBoundingClientRect();
+      const w = Math.min(r.right, t.right) - Math.max(r.left, t.left);
+      const h = Math.min(r.bottom, t.bottom) - Math.max(r.top, t.top);
+      const cover = w > 0 && h > 0 ? (w * h) / thumbArea : 0;
+      if (cover > bestCover) {
+        best = m;
+        bestCover = cover;
+      }
+    }
+    return bestCover >= 0.4 ? best : null;
+  }
+
+  function enlargePreview(media) {
+    const restore = [];
+    // The whole style attribute is saved and put back on close.
+    const setStyles = (el, props) => {
+      const before = el.getAttribute("style");
+      restore.push(() => (before === null ? el.removeAttribute("style") : el.setAttribute("style", before)));
+      for (const [prop, value] of Object.entries(props)) el.style.setProperty(prop, value, "important");
+    };
+
+    for (let a = media.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      const props = {};
+      // Anything that would make a fixed element size itself to this box instead of the window,
+      // or clip it.
+      if (cs.transform !== "none") props.transform = "none";
+      if (cs.translate !== "none") props.translate = "none";
+      if (cs.scale !== "none") props.scale = "none";
+      if (cs.rotate !== "none") props.rotate = "none";
+      if (cs.filter !== "none") props.filter = "none";
+      if (cs.backdropFilter && cs.backdropFilter !== "none") props["backdrop-filter"] = "none";
+      if (cs.perspective !== "none") props.perspective = "none";
+      if (cs.contain !== "none") props.contain = "none";
+      if (cs.containerType && cs.containerType !== "normal") props["container-type"] = "normal";
+      if (cs.willChange !== "auto") props["will-change"] = "auto";
+      if (cs.clipPath !== "none") props["clip-path"] = "none";
+      if (cs.maskImage && cs.maskImage !== "none") props["mask-image"] = "none";
+      if (cs.contentVisibility && cs.contentVisibility !== "visible") props["content-visibility"] = "visible";
+      // Lift every stacking layer on the way up, so the site's header can't cover the video.
+      if (cs.zIndex !== "auto" || cs.position === "fixed" || cs.position === "sticky") props["z-index"] = "2147483646";
+      if (cs.opacity !== "1") props.opacity = "1";
+      if (cs.isolation === "isolate") props.isolation = "auto";
+      if (Object.keys(props).length) setStyles(a, props);
+
+      // A link around the preview would open the video's page when the video is clicked.
+      if (a.matches("a[href]")) {
+        const href = a.getAttribute("href");
+        a.removeAttribute("href");
+        restore.push(() => a.setAttribute("href", href));
+      }
+    }
+
+    setStyles(media, {
+      position: "fixed",
+      inset: "0",
+      width: "100vw",
+      height: "100vh",
+      "max-width": "none",
+      "max-height": "none",
+      "min-width": "0",
+      "min-height": "0",
+      margin: "0",
+      display: "block",
+      "z-index": "2147483646",
+      "object-fit": "contain",
+      background: "#000",
+      transform: "none",
+      "border-radius": "0",
+      opacity: "1",
+      visibility: "visible",
+      "pointer-events": "auto"
+    });
+
+    // The preview itself is left as the site plays it (sound, playback); only its size changes.
+    // pointer-events stays on so the mouse is over the preview, which keeps the site's hover
+    // (and the preview) alive. Clicks on it are kept away from the site, which might open the
+    // video's page on them.
+    const swallow = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const noScroll = (e) => e.preventDefault();
+    const CLICKS = ["click", "dblclick", "auxclick", "mousedown", "mouseup", "pointerdown", "pointerup"];
+    CLICKS.forEach((type) => media.addEventListener(type, swallow));
+    media.addEventListener("wheel", noScroll, { passive: false });
+    restore.push(() => {
+      CLICKS.forEach((type) => media.removeEventListener(type, swallow));
+      media.removeEventListener("wheel", noScroll);
+    });
+
+    // Close button and hint, placed next to the video so the mouse never leaves the thumbnail.
+    const ui = document.createElement("div");
+    ui.id = "te-preview-ui";
+    ui.append(...createCloseControls());
+    CLICKS.forEach((type) => ui.addEventListener(type, swallow));
+    media.parentElement.appendChild(ui);
+
+    // If the site removes the preview (it ended, say), put everything back.
+    const timer = setInterval(() => {
+      if (!media.isConnected) {
+        closeOverlay();
+        toast("The site stopped the preview.");
+      }
+    }, 500);
+
+    preview = { restore, ui, timer };
+    document.addEventListener("keydown", onKeyDown, true);
+  }
+
+  function closePreview() {
+    if (!preview) return;
+    clearInterval(preview.timer);
+    preview.ui.remove();
+    preview.restore.reverse().forEach((undo) => undo());
+    preview = null;
+    document.removeEventListener("keydown", onKeyDown, true);
+  }
+
+  // Closes whichever expanded view is open.
   function closeOverlay() {
+    closePreview();
     if (!overlay) return;
     stopFramePoll();
     overlay.remove();

@@ -85,8 +85,24 @@
   opacity: 0;
 }
 
+/* Preview mode: the enlarged preview stays in the page; this layer holds its close button.
+   It sits next to the video (inside the thumbnail), above it, and lets the mouse through. */
+#te-preview-ui {
+  all: initial;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #fff;
+}
+
+#te-preview-ui .te-close {
+  pointer-events: auto;
+}
+
 /* Close button and Esc hint */
-#te-overlay .te-close {
+:is(#te-overlay, #te-preview-ui) .te-close {
   all: initial;
   position: absolute;
   top: 14px;
@@ -108,24 +124,24 @@
   transition: background 0.15s ease, transform 0.15s ease;
 }
 
-#te-overlay .te-close svg {
+:is(#te-overlay, #te-preview-ui) .te-close svg {
   display: block;
   width: 18px;
   height: 18px;
   pointer-events: none;
 }
 
-#te-overlay .te-close:hover {
+:is(#te-overlay, #te-preview-ui) .te-close:hover {
   background: rgba(239, 68, 68, 0.9);
   transform: scale(1.06);
 }
 
-#te-overlay .te-close:focus-visible {
+:is(#te-overlay, #te-preview-ui) .te-close:focus-visible {
   outline: 2px solid #a5b4fc;
   outline-offset: 2px;
 }
 
-#te-overlay .te-hint {
+:is(#te-overlay, #te-preview-ui) .te-hint {
   position: absolute;
   top: 22px;
   right: 64px;
@@ -139,7 +155,7 @@
   animation: te-hint 2.8s ease forwards;
 }
 
-#te-overlay .te-hint kbd {
+:is(#te-overlay, #te-preview-ui) .te-hint kbd {
   font: 600 11px/1 system-ui, sans-serif;
   padding: 2px 5px;
   border-radius: 4px;
@@ -375,7 +391,7 @@ html.te-debug .te-expand-btn {
 @media (prefers-reduced-motion: reduce) {
   .te-expand-btn,
   #te-overlay,
-  #te-overlay .te-close {
+  :is(#te-overlay, #te-preview-ui) .te-close {
     transition: none;
     animation: none;
   }

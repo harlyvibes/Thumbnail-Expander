@@ -32,7 +32,8 @@ Click the toolbar icon and choose **Settings** (or `chrome://extensions` > Thumb
   - **Domains**: where the rule applies (subdomains included).
   - **Thumbnail selector**: CSS selector for the thumbnail element. The button is placed inside it.
   - **Link selector** (optional): CSS selector for the element whose `href` points to the video. It is looked for inside the thumbnail first, then in the elements around it. Defaults to `a[href]`.
-  - **Playback mode**:
+  - **Playback mode** (also switchable from the toolbar popup):
+    - **Preview**: for sites that play a preview when you hover a thumbnail. Hover until the preview starts, then click expand: that same preview fills the window, exactly as the site plays it. Nothing new is loaded, so it never opens the video's page. Clicks on the enlarged preview are blocked so they can't open it either. Needs no other settings.
     - **Page**: loads the video's own page in a full-window frame and hides everything except the player. Needs a **Player selector** (YouTube: `#movie_player`). Only works for links on the same site, and only on sites that allow their pages in frames.
     - **Embed**: loads the site's embeddable player. Needs a **Video ID pattern** (regex, group 1 = the ID) and an **Embed URL** with `{id}` where the ID goes.
 
@@ -69,6 +70,9 @@ All in the toolbar popup:
 - **Pick thumbnail** / **Pick player**: point at an element and click to save a selector for it. **↑**/**↓** move to the parent/child element, and **Esc** cancels. The label shows the selector it will use and how many elements on the page it matches.
 
 Common problems:
+
+- **Expanding opens the video's page (or counts as a visit)**: that's page mode. If the site plays previews on hover, switch it to **Preview** mode in the toolbar popup.
+- **"No preview is playing in this thumbnail"** (preview mode): hover the thumbnail until the site starts its preview, then click expand.
 
 - **Audio but no picture when expanded**: the player selector doesn't match the element around the video, so the video gets hidden. Open a video, then press **Alt+Shift+P** over the player (debug mode), or use **Check this page** or **Pick player**.
 - **No expand buttons**: the thumbnail selector matches nothing. Turn on debug mode to see the outlines, or use **Pick thumbnail**.

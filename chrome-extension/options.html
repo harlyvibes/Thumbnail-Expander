@@ -73,6 +73,7 @@
           <li>If the video link isn't found automatically, set <b>Link selector</b>. It's looked for inside the thumbnail first, then in the elements around it.</li>
           <li>Pick a <b>Playback mode</b>:
             <ul>
+              <li><b>Preview</b>: for sites that play a video when you hover a thumbnail. Hover until the preview starts, then click expand: that preview fills the window. Nothing else is loaded, so it never opens the video's page. Needs no other settings.</li>
               <li><b>Page</b> (try this first): loads the video's own page full-window and hides everything but the player. Inspect the player on a video page and set <b>Player selector</b> to the element holding the video and its controls (YouTube: <code>#movie_player</code>). Some sites, like Dailymotion, refuse to be shown this way.</li>
               <li><b>Embed</b>: uses the site's embeddable player. Set a <b>Video ID pattern</b> whose first group captures the ID from the link (for <code>/video/x8abc12</code>: <code>/video/([A-Za-z0-9]+)</code>) and an <b>Embed URL</b> with <code>{id}</code> where the ID goes.</li>
             </ul>
@@ -127,6 +128,7 @@
           <div class="field full">
             <span class="field-label">Playback mode</span>
             <div class="segmented" role="radiogroup" aria-label="Playback mode">
+              <input type="radio" data-mode value="preview"><label>Preview</label>
               <input type="radio" data-mode value="page"><label>Page</label>
               <input type="radio" data-mode value="embed"><label>Embed</label>
             </div>

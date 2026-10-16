@@ -7,6 +7,7 @@
 
   const TEXT_FIELDS = ["name", "hosts", "thumbnail", "link", "playerSelector", "idPattern", "embedUrl"];
   const MODE_HINTS = {
+    preview: "Enlarges the preview the site plays when you hover a thumbnail. Nothing new is loaded, so it never opens the video's page. Hover until the preview starts, then click expand.",
     page: "Loads the video's own page full-window and hides everything but the player. Use this when the site blocks embedding. Only works for links on the same site.",
     embed: "Loads the site's embeddable player, built from the video ID in the link."
   };
@@ -92,7 +93,7 @@
 
     card.querySelector("[data-name]").textContent = name;
     card.querySelector("[data-hosts]").textContent = hosts || "No domain yet";
-    card.querySelector("[data-mode-badge]").textContent = mode === "page" ? "Page mode" : "Embed mode";
+    card.querySelector("[data-mode-badge]").textContent = { preview: "Preview mode", page: "Page mode", embed: "Embed mode" }[mode];
     card.querySelector("[data-mode-hint]").textContent = MODE_HINTS[mode];
     card.dataset.mode = mode;
     card.classList.toggle("disabled", !enabled);
@@ -146,7 +147,9 @@
       if (!isSelector(site.thumbnail)) return fail("thumbnail", "the thumbnail selector isn't valid CSS.");
       if (site.link && !isSelector(site.link)) return fail("link", "the link selector isn't valid CSS.");
 
-      if (site.mode === "page") {
+      if (site.mode === "preview") {
+        // Nothing else to check: the preview is found on the page when you click expand.
+      } else if (site.mode === "page") {
         if (!site.playerSelector) return fail("playerSelector", "page mode needs a player selector.");
         if (!isSelector(site.playerSelector)) return fail("playerSelector", "the player selector isn't valid CSS.");
       } else {

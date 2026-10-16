@@ -7,7 +7,10 @@
 //   thumbnail      - CSS selector for the thumbnail element; the expand button is added inside it
 //   link           - CSS selector for the element whose href points to the video. It is looked up
 //                    inside the thumbnail first, then among its ancestors. Leave empty for "a[href]".
-//   mode           - "page":  load the video's own page in a full-window frame and enlarge its player.
+//   mode           - "preview": enlarge the video the site already plays when you hover the
+//                             thumbnail (its hover preview) to fill the window. Loads nothing new,
+//                             so it never opens the video's page.
+//                    "page":  load the video's own page in a full-window frame and enlarge its player.
 //                             Works when embedding is blocked (YouTube refuses embeds on youtube.com).
 //                             Only works for links on the same site.
 //                    "embed": load the site's embeddable player using idPattern + embedUrl.

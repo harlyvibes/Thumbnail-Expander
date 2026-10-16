@@ -99,7 +99,8 @@ details[open] > summary .chevron { transform: rotate(90deg); }
 
 /* Hide the fields that don't apply to the selected mode */
 .site[data-mode="page"] .only-embed,
-.site[data-mode="embed"] .only-page { display: none; }
+.site[data-mode="embed"] .only-page,
+.site[data-mode="preview"] :is(.only-page, .only-embed) { display: none; }
 
 .site-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
 

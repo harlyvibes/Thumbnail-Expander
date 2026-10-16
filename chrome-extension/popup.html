@@ -36,6 +36,15 @@
         </span>
         <input type="checkbox" class="switch" id="site-enabled">
       </label>
+      <div class="mode-row">
+        <span class="row-desc plain">Mode</span>
+        <div class="segmented small" id="mode" role="radiogroup" aria-label="Playback mode">
+          <input type="radio" name="mode" id="mode-preview" value="preview"><label for="mode-preview" title="Enlarge the hover preview">Preview</label>
+          <input type="radio" name="mode" id="mode-page" value="page"><label for="mode-page" title="Load the video's page">Page</label>
+          <input type="radio" name="mode" id="mode-embed" value="embed"><label for="mode-embed" title="Use the embed player">Embed</label>
+        </div>
+      </div>
+      <p class="mode-hint" id="mode-hint"></p>
     </div>
     <div class="state-norule">
       <p class="site-msg">No rule for <b id="host"></b> yet.</p>
