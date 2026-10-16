@@ -3,9 +3,7 @@
   const BUTTON_CLASS = "te-expand-btn";
   const ATTACHED_ATTR = "data-te-attached";
   const FRAME_STYLE_ID = "te-frame-style";
-  const FRAME_TIMEOUT_MS = 10000;
-  // What counts as "the video" inside a page-mode player element.
-  const PLAYER_MEDIA = "video, iframe, canvas, embed, object";
+  const FRAME_TIMEOUT_MS = 15000;
 
   let settings = null;
   let activeRules = [];
@@ -206,14 +204,6 @@
     return msg;
   }
 
-  // Note along the bottom of the overlay that fades out after a few seconds.
-  function showNotice(text) {
-    const notice = document.createElement("div");
-    notice.className = "te-notice";
-    notice.textContent = text;
-    overlay.appendChild(notice);
-  }
-
   // Spinner shown under the frame until the video is ready.
   function showLoading() {
     const wrap = document.createElement("div");
@@ -289,26 +279,19 @@
 
     const started = Date.now();
     let pausedOnce = false;
-    let player = null;
 
     const reveal = () => {
       iframe.classList.remove("te-loading");
       loading.remove();
     };
 
-    // If the player can't be found, undo the hiding so the video isn't left invisible
-    // (which would leave only its audio), and say why.
-    const giveUp = (doc) => {
-      doc?.getElementById(FRAME_STYLE_ID)?.remove();
-      reveal();
-      showNotice(
-        player
-          ? "The player selector matched something without the video in it, so the whole page is shown. Check this site's Player selector in the settings."
-          : "Couldn't find the player on this page, so the whole page is shown. Check this site's Player selector in the settings."
-      );
-    };
-
     framePoll = setInterval(() => {
+      if (Date.now() - started > FRAME_TIMEOUT_MS) {
+        stopFramePoll();
+        reveal();
+        return;
+      }
+
       let doc = null;
       try {
         doc = iframe.contentDocument;
@@ -318,13 +301,6 @@
         reveal();
         return;
       }
-
-      if (Date.now() - started > FRAME_TIMEOUT_MS) {
-        stopFramePoll();
-        giveUp(doc);
-        return;
-      }
-
       // The frame starts on about:blank before the real page loads.
       if (!doc || doc.location.href === "about:blank" || !doc.head) return;
 
@@ -337,9 +313,8 @@
         doc.addEventListener("keydown", onKeyDown, true);
       }
 
-      // Wait until the player exists and has the video inside it; players often add it late.
-      player = doc.querySelector(rule.playerSelector);
-      if (!player || !player.querySelector(PLAYER_MEDIA)) return;
+      const player = doc.querySelector(rule.playerSelector);
+      if (!player) return;
 
       const video = player.querySelector("video");
       if (!settings.autoplay && video && !pausedOnce) {
