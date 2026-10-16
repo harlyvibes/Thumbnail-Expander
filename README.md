@@ -39,7 +39,9 @@ The `firefox-extension` folder is generated from `chrome-extension`: the code is
 
 1. Hover a thumbnail until the site starts its preview.
 2. Click the expand button in the thumbnail's top-left corner. The preview fills the window, exactly as the site plays it.
-3. Press **Esc** to put it back. There's also a close button in the top-right corner. It stays hidden until you move the mouse, and hides again when the mouse rests for a few seconds. So does the mouse cursor.
+3. Press **Esc** to put it back. There's also a close button in the top-right corner.
+
+In the bottom-left corner there's a volume control: click the speaker to mute or unmute, drag the slider, or use the mouse wheel over it. Closing puts the sound back as the site had it. The controls stay hidden until you move the mouse, and hide again when the mouse rests for a few seconds. So does the mouse cursor.
 
 While it's enlarged, you can move the mouse anywhere and the preview keeps playing. Clicks on the preview are blocked, so they can't open the video. The page doesn't scroll, and its scrollbar is hidden. If you click expand before the preview starts, it waits a few seconds for it.
 

@@ -131,16 +131,99 @@
   transition: opacity 0.25s ease, background 0.15s ease, transform 0.15s ease;
 }
 
-/* The cursor over the preview, and the close button, hide while the mouse rests (see
-   revealControls in content.js). The close button also starts out hidden. */
+/* The cursor over the preview and the controls (close button, volume) hide while the mouse rests
+   (see revealControls in content.js). The controls also start out hidden. */
 [data-te-enlarged="idle"]:not(#te-x):not(#te-x):not(#te-x) {
   cursor: none !important;
 }
 
-#te-preview-ui.te-idle .te-close {
+#te-preview-ui.te-idle .te-close,
+#te-preview-ui.te-idle .te-volume {
   opacity: 0;
   pointer-events: none;
 }
+
+/* Volume: mute button and slider, bottom left */
+#te-preview-ui .te-volume {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  box-sizing: border-box;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px 0 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(18, 18, 24, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  transition: opacity 0.25s ease;
+}
+
+#te-preview-ui .te-volume button {
+  all: initial;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+#te-preview-ui .te-volume button:hover { background: rgba(255, 255, 255, 0.14); }
+#te-preview-ui .te-volume button:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 1px; }
+
+#te-preview-ui .te-volume svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+/* A thin white track, filled up to the level (--te-level, set by content.js) */
+#te-preview-ui .te-volume input {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 110px;
+  height: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: linear-gradient(to right, #fff var(--te-level, 100%), rgba(255, 255, 255, 0.3) var(--te-level, 100%));
+  cursor: pointer;
+  outline: none;
+}
+
+#te-preview-ui .te-volume input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+#te-preview-ui .te-volume input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+#te-preview-ui .te-volume input::-moz-range-track { background: transparent; }
+#te-preview-ui .te-volume input:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 6px; }
 
 #te-preview-ui .te-close svg {
   display: block;

@@ -119,6 +119,12 @@
   // Rounded-stroke line icons (24x24). The expand corners match the extension icon.
   const EXPAND_ICON = "M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3";
   const CLOSE_ICON = "M6 6l12 12M18 6L6 18";
+  const SPEAKER = "M11 5L6 9H3v6h3l5 4z";
+  const VOLUME_ICONS = {
+    muted: SPEAKER + "M16 9l6 6M22 9l-6 6",
+    low: SPEAKER + "M15.5 8.5a5 5 0 0 1 0 7",
+    high: SPEAKER + "M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"
+  };
 
   // Built with DOM calls rather than innerHTML, which some sites (e.g. YouTube) forbid.
   function createIcon(d) {
@@ -297,13 +303,16 @@
       window.removeEventListener("wheel", noScroll, { capture: true });
     });
 
-    // Close button and hint, in the top layer above the preview. They sit next to the preview in
-    // the page, so the mouse is still inside the thumbnail as far as the page can tell.
+    // Close button, hint and volume control, in the top layer above the preview. They sit next to
+    // the preview in the page, so the mouse is still inside the thumbnail as far as the page can
+    // tell.
     const ui = document.createElement("div");
     ui.id = "te-preview-ui";
-    ui.className = "te-idle"; // the close button shows once the mouse moves
+    ui.className = "te-idle"; // the controls show once the mouse moves
     ui.setAttribute("popover", "manual");
     ui.append(...createCloseControls());
+    const volume = createVolumeControl(media, restore);
+    if (volume) ui.append(volume);
     CLICKS.forEach((type) => ui.addEventListener(type, (e) => e.stopPropagation()));
     media.parentElement.appendChild(ui);
 
@@ -356,9 +365,9 @@
     if (bodyScrolls) hide(body);
   }
 
-  // Like a video player, the close button and the mouse cursor show while the mouse moves over
-  // the enlarged preview and hide once it rests (unless it's resting on the button). The close
-  // button starts out hidden; the cursor hides after the first rest.
+  // Like a video player, the controls (close button, volume) and the mouse cursor show while the
+  // mouse moves over the enlarged preview and hide once it rests (unless it's resting on a
+  // control). The controls start out hidden; the cursor hides after the first rest.
   function revealControls() {
     const p = preview;
     if (!p.moved) {
@@ -374,12 +383,12 @@
     clearTimeout(p.idleTimer);
     p.idleTimer = setTimeout(function hide() {
       if (preview !== p) return;
-      if (p.ui.querySelector(".te-close:hover")) p.idleTimer = setTimeout(hide, CONTROLS_IDLE_MS);
+      if (p.ui.querySelector(".te-close:hover, .te-volume:hover")) p.idleTimer = setTimeout(hide, CONTROLS_IDLE_MS);
       else setIdle(p, true);
     }, CONTROLS_IDLE_MS);
   }
 
-  // content.css hides the close button (te-idle) and the cursor over the preview ("idle").
+  // content.css hides the controls (te-idle) and the cursor over the preview ("idle").
   function setIdle(p, idle) {
     p.ui.classList.toggle("te-idle", idle);
     p.media.setAttribute(ENLARGED_ATTR, idle ? "idle" : "");
@@ -468,6 +477,65 @@
     key.textContent = "Esc";
     hint.append("Press ", key, " to close");
     return [closeBtn, hint];
+  }
+
+  // Mute button and volume slider for the enlarged preview (bottom left). The mouse wheel over it
+  // changes the volume too. If you change the sound, it's put back as the site had it on close.
+  // Returns null for a player iframe, whose sound the page can't reach.
+  function createVolumeControl(media, restore) {
+    if (!media.matches("video, audio")) return null;
+    const before = { muted: media.muted, volume: media.volume };
+    let changed = false;
+    let lastLevel = media.volume || 1; // what unmuting goes back to
+
+    const wrap = document.createElement("div");
+    wrap.className = "te-volume";
+    const button = document.createElement("button");
+    button.type = "button";
+    const icon = createIcon(VOLUME_ICONS.high);
+    button.appendChild(icon);
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "0";
+    slider.max = "1";
+    slider.step = "0.01";
+    slider.setAttribute("aria-label", "Volume");
+    wrap.append(button, slider);
+
+    const level = () => (media.muted ? 0 : media.volume);
+    // Shows the preview's sound as it is, whoever changed it.
+    const show = () => {
+      const v = level();
+      if (v > 0) lastLevel = v;
+      slider.value = String(v);
+      slider.style.setProperty("--te-level", `${Math.round(v * 100)}%`);
+      icon.firstChild.setAttribute("d", v === 0 ? VOLUME_ICONS.muted : v < 0.5 ? VOLUME_ICONS.low : VOLUME_ICONS.high);
+      button.setAttribute("aria-label", v === 0 ? "Unmute" : "Mute");
+    };
+    const setLevel = (v) => {
+      changed = true;
+      v = Math.min(1, Math.max(0, v));
+      if (v > 0) media.volume = v;
+      media.muted = v === 0;
+      // Using the control counts as moving the mouse: keep the controls up.
+      if (preview) {
+        setIdle(preview, false);
+        restartIdleTimer(preview);
+      }
+    };
+
+    button.addEventListener("click", () => setLevel(level() === 0 ? lastLevel : 0));
+    slider.addEventListener("input", () => setLevel(Number(slider.value)));
+    wrap.addEventListener("wheel", (e) => setLevel(level() + (e.deltaY < 0 ? 0.05 : -0.05)));
+    media.addEventListener("volumechange", show);
+    restore.push(() => {
+      media.removeEventListener("volumechange", show);
+      if (!changed) return;
+      media.volume = before.volume;
+      media.muted = before.muted;
+    });
+    show();
+    return wrap;
   }
 
   function onKeyDown(e) {
