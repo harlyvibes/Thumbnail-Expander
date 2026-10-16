@@ -65,11 +65,12 @@ All in the toolbar popup:
 
 - **Debug mode**: logs what the extension does to the browser console (filter it by `Thumbnail Expander`), outlines every thumbnail it recognized in purple, and keeps their buttons visible. When you expand a video, a panel in the top-left says what the player selector matched, whether the video is inside it, and suggests a better selector with a **Use** button.
 - **Check this page**: tests the site's rule against the open page and outlines what matches: thumbnails in purple, the player in red. It reports how many thumbnails matched and whether their video links were found, plus the embed URL in embed mode. On a video page, it reports whether the player selector contains the video, and suggests one with a **Use** button if it doesn't.
+- **Alt+Shift+P** (Option+Shift+P on Mac), in debug mode: on a video page, hover over the player and press it to save that player as the site's player selector, without opening the popup. If the player is in an iframe and you've clicked into it, click somewhere else on the page first so the shortcut reaches the page.
 - **Pick thumbnail** / **Pick player**: point at an element and click to save a selector for it. **↑**/**↓** move to the parent/child element, and **Esc** cancels. The label shows the selector it will use and how many elements on the page it matches.
 
 Common problems:
 
-- **Audio but no picture when expanded**: the player selector doesn't match the element around the video, so the video gets hidden. Open a video, then use **Check this page** or **Pick player**.
+- **Audio but no picture when expanded**: the player selector doesn't match the element around the video, so the video gets hidden. Open a video, then press **Alt+Shift+P** over the player (debug mode), or use **Check this page** or **Pick player**.
 - **No expand buttons**: the thumbnail selector matches nothing. Turn on debug mode to see the outlines, or use **Pick thumbnail**.
 - **"Reload the page and try again"** in the popup: the page was open before the extension was installed or reloaded.
 

@@ -153,6 +153,27 @@ function tePlayerElementFor(el) {
   return pick.e;
 }
 
+// The video (or player iframe) under the mouse, starting from the hovered element. Hovering a
+// player usually lands on one of its controls, so this walks up from "the play button" until it
+// finds a sizeable video. With a mouse position, the video must be under it (with a margin for
+// control bars drawn just outside the picture), so hovering elsewhere on the page finds nothing.
+function teMediaNear(el, point) {
+  const usable = (m) => {
+    const r = m.getBoundingClientRect();
+    if (r.width < 150 || r.height < 80) return false;
+    if (!point) return true;
+    const mx = 8;
+    const my = Math.max(24, r.height * 0.15);
+    return point.x >= r.left - mx && point.x <= r.right + mx && point.y >= r.top - my && point.y <= r.bottom + my;
+  };
+  for (let e = el; e && e !== e.ownerDocument.body; e = e.parentElement) {
+    if (e.matches("video, iframe") && usable(e)) return e;
+    const inside = [...e.querySelectorAll("video, iframe")].find(usable);
+    if (inside) return inside;
+  }
+  return null;
+}
+
 // The biggest visible video on the page, or failing that the biggest large iframe (a player
 // embedded from another domain).
 function teFindMainMedia(doc = document) {

@@ -36,6 +36,8 @@ svg path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: ro
 .pick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pick-row .btn { padding: 0 6px; gap: 5px; font-size: 12.5px; white-space: nowrap; }
 body.nopage .debug { display: none; }
+.shortcut-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.shortcut-hint kbd { font-size: 10.5px; padding: 0 4px; }
 
 .report {
   list-style: none;

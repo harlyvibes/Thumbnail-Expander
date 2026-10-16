@@ -22,6 +22,9 @@
     settings = await loadSettings();
     applySettings();
 
+    window.addEventListener("keydown", onDebugShortcut, true);
+    document.addEventListener("mousemove", onMouseMove, { capture: true, passive: true });
+
     // Requests from the toolbar popup's debug tools.
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg?.type === "te-check") {
@@ -554,10 +557,16 @@
     if (!el) return;
 
     // Arrow keys can land on an image; the thumbnail must be able to hold the button.
-    const target = kind === "thumbnail" ? teButtonHost(el) : el;
-    const suggestion = teSuggestSelector(target, kind);
+    await saveElementSelector(field, kind === "thumbnail" ? teButtonHost(el) : el);
+  }
+
+  // Builds a selector for the element, saves it into this site's rule, outlines what it
+  // matches, and says what was saved.
+  async function saveElementSelector(field, el) {
+    const kind = field === "playerSelector" ? "player" : "thumbnail";
+    const suggestion = teSuggestSelector(el, kind);
     if (!suggestion) {
-      toast("Couldn't build a selector for that element. Try its parent (↑) next time.");
+      toast("Couldn't build a selector for that element. Try Pick in the toolbar popup and choose its parent (↑).");
       return;
     }
     const { rule, created, switchedToPage } = await saveSelector(field, suggestion.sel);
@@ -573,6 +582,38 @@
       text += " Next: open a video and use Pick player.";
     }
     toast(text);
+  }
+
+  // Last mouse position, for the debug shortcut (null until the mouse moves).
+  let lastMouse = null;
+  function onMouseMove(e) {
+    lastMouse = { x: e.clientX, y: e.clientY };
+  }
+
+  // Debug mode shortcut: Alt+Shift+P (Option+Shift+P on Mac) saves the player under the mouse as
+  // this site's player selector. Matched by key position so it works on any keyboard layout.
+  function onDebugShortcut(e) {
+    if (!settings?.debug || e.code !== "KeyP" || !e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    grabPlayerUnderMouse();
+  }
+
+  async function grabPlayerUnderMouse() {
+    if (overlay) {
+      toast("Close the expanded video first, then use Alt+Shift+P on the video's own page.");
+      return;
+    }
+    // The innermost hovered element. A player in a cross-site iframe still shows up here, as the
+    // iframe itself (its own mouse moves don't reach this page, so lastMouse is from its edge).
+    const hovered = [...document.querySelectorAll(":hover")].pop();
+    const media = hovered && teMediaNear(hovered, lastMouse);
+    log("Alt+Shift+P: hovered", hovered, "video", media);
+    if (!media) {
+      toast("No video under the mouse. Hover over the player and press Alt+Shift+P again.");
+      return;
+    }
+    await saveElementSelector("playerSelector", tePlayerElementFor(media));
   }
 
   function stopFramePoll() {
